@@ -4,32 +4,42 @@
 
 ![Stack](https://img.shields.io/badge/Node.js-20-green) ![Docker](https://img.shields.io/badge/Docker-Compose-blue) ![SQLite](https://img.shields.io/badge/DB-SQLite-lightgrey) ![License](https://img.shields.io/badge/License-MIT-yellow)
 
+---
+
 ## Возможности
 
 - 🖥️ Управление несколькими нодами из одного интерфейса
-- ➕ Добавление / удаление нод через веб (SSH пароль или ключ)
-- 👥 Создание юзеров — каждый получает уникальную ссылку `tg://proxy`
+- ➕ Добавление нод через веб — SSH пароль или ключ
+- 👥 Создание юзеров с уникальной ссылкой `tg://proxy`
 - ⏸️ Остановка / запуск отдельных юзеров
 - 📊 Дашборд с live-статусом всех нод
 - 🔗 Копирование ссылки одним кликом
-- 📋 Просмотр всех юзеров со всех нод в одной таблице
+- 📋 Единая таблица всех юзеров со всех нод
 
 ---
 
-## ⚡ Быстрая установка (рекомендуется)
-
-Одна команда — скрипт сам спросит всё необходимое:
+## ⚡ Установка
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/MaksimTMB/mtg-adminpanel/main/install.sh)
 ```
 
-Скрипт:
-- Установит Docker если не установлен
-- Клонирует репозиторий
+Скрипт задаст несколько вопросов и всё настроит автоматически:
+- Установит Docker (если не установлен)
+- Скачает панель
 - Спросит токен, порт, нужен ли SSL
-- Настроит Nginx + Let's Encrypt (опционально)
+- Настроит Nginx + Let's Encrypt (по желанию)
 - Настроит автозапуск
+
+---
+
+## 🗑️ Удаление
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/MaksimTMB/mtg-adminpanel/main/uninstall.sh)
+```
+
+Удалит контейнер, файлы, сервис и Nginx конфиг.
 
 ---
 
@@ -41,96 +51,46 @@ bash <(curl -fsSL https://raw.githubusercontent.com/MaksimTMB/mtg-adminpanel/mai
 
 ---
 
-## Установка
+## Ручная установка
 
-### Вариант 1 — Простой (HTTP, без домена)
-
-Подходит если нет домена и SSL не нужен.
+### Вариант 1 — HTTP (без домена)
 
 ```bash
-# Клонируй репозиторий
-git clone https://github.com/MaksimTMB/mtg-adminpanel.git
-cd mtg-adminpanel
-
-# Создай .env
+git clone https://github.com/MaksimTMB/mtg-adminpanel.git /opt/mtg-adminpanel
+cd /opt/mtg-adminpanel
 cp .env.example .env
-nano .env  # укажи свой AUTH_TOKEN
-
-# Создай папки
+nano .env            # укажи AUTH_TOKEN
 mkdir -p data ssh_keys
-
-# Запусти
 docker compose up -d --build
 ```
 
-Панель доступна на: `http://<IP_СЕРВЕРА>:3000`
+Панель: `http://<IP>:3000`
 
 ---
 
-### Вариант 2 — С доменом и SSL через Nginx (без NPM)
+### Вариант 2 — HTTPS через Nginx
 
 ```bash
-# Клонируй и настрой
-git clone https://github.com/MaksimTMB/mtg-adminpanel.git
-cd mtg-adminpanel
-cp .env.example .env
-nano .env  # укажи AUTH_TOKEN
+git clone https://github.com/MaksimTMB/mtg-adminpanel.git /opt/mtg-adminpanel
+cd /opt/mtg-adminpanel
+cp .env.example .env && nano .env
 mkdir -p data ssh_keys
-
-# Установи Certbot
-apt install -y certbot
-certbot certonly --standalone -d proxy.yourdomain.com
-
-# Установи Nginx
-apt install -y nginx
-
-# Создай конфиг
-cat > /etc/nginx/sites-available/mtg-panel << 'EOF'
-server {
-    listen 80;
-    server_name proxy.yourdomain.com;
-    return 301 https://$host$request_uri;
-}
-
-server {
-    listen 443 ssl;
-    server_name proxy.yourdomain.com;
-
-    ssl_certificate /etc/letsencrypt/live/proxy.yourdomain.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/proxy.yourdomain.com/privkey.pem;
-
-    location / {
-        proxy_pass http://localhost:3000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
-}
-EOF
-
-ln -s /etc/nginx/sites-available/mtg-panel /etc/nginx/sites-enabled/
-nginx -t && systemctl reload nginx
-
-# Запусти панель
 docker compose up -d --build
-```
 
-Панель доступна на: `https://proxy.yourdomain.com`
+# Nginx + SSL
+apt install -y nginx certbot python3-certbot-nginx
+certbot --nginx -d proxy.yourdomain.com
+```
 
 ---
 
 ### Вариант 3 — С Nginx Proxy Manager (NPM)
 
-Если уже используешь NPM для управления доменами.
-
 ```bash
-# Клонируй и настрой
-git clone https://github.com/MaksimTMB/mtg-adminpanel.git
-cd mtg-adminpanel
-cp .env.example .env
-nano .env  # укажи AUTH_TOKEN
+git clone https://github.com/MaksimTMB/mtg-adminpanel.git /opt/mtg-adminpanel
+cd /opt/mtg-adminpanel
+cp .env.example .env && nano .env
 mkdir -p data ssh_keys
-
-# Запусти
 docker compose up -d --build
 ```
 
@@ -138,12 +98,10 @@ docker compose up -d --build
 
 | Поле | Значение |
 |------|----------|
-| Domain Names | `proxy.yourdomain.com` |
-| Scheme | `http` |
-| Forward Hostname | IP сервера |
+| Domain | `proxy.yourdomain.com` |
+| Forward Host | IP сервера |
 | Forward Port | `3000` |
 | Force SSL | ✅ |
-| SSL Certificate | Let's Encrypt |
 
 ---
 
@@ -160,19 +118,24 @@ DATA_DIR=/data                 # путь к базе данных
 ## Добавление ноды
 
 1. Открой панель → **Ноды** → **Добавить ноду**
-2. Заполни:
-   - **Название** — любое (Helsinki, Moscow...)
-   - **Host / IP** — домен или IP ноды
-   - **SSH User** — обычно `root`
-   - **SSH Port** — обычно `22`
-   - **Аутентификация** — пароль или SSH ключ
+2. Заполни: название, Host / IP, SSH User, SSH Port, пароль или ключ
 3. Нажми **Ping** — убедись что нода онлайн ✅
 4. Перейди в **Управление** → **Добавить юзера**
 
 ### Требования к ноде
+- Docker + Docker Compose
+- Открытый порт `4433+` TCP в файрволе
 
-- Docker + Docker Compose установлены
-- Открытые порты `4433+` (TCP) в файрволе / Security Group
+---
+
+## Управление контейнером
+
+```bash
+docker logs mtg-panel -f          # логи
+docker restart mtg-panel          # перезапуск
+cd /opt/mtg-adminpanel && docker compose down   # остановка
+cd /opt/mtg-adminpanel && git pull && docker compose up -d --build  # обновление
+```
 
 ---
 
@@ -180,28 +143,27 @@ DATA_DIR=/data                 # путь к базе данных
 
 ```
 mtg-adminpanel/
+├── install.sh          # скрипт установки
+├── uninstall.sh        # скрипт удаления
 ├── Dockerfile
 ├── docker-compose.yml
 ├── .env.example
-├── .gitignore
-├── README.md
 ├── backend/
-│   ├── package.json
 │   └── src/
 │       ├── app.js      # Express API
 │       ├── db.js       # SQLite
 │       └── ssh.js      # SSH управление нодами
 ├── public/
 │   └── index.html      # React SPA
-├── data/               # SQLite БД (в .gitignore)
-└── ssh_keys/           # SSH ключи (в .gitignore — не коммитить!)
+├── data/               # БД (в .gitignore)
+└── ssh_keys/           # ключи (в .gitignore)
 ```
 
 ---
 
 ## API
 
-Все запросы требуют заголовок: `x-auth-token: <AUTH_TOKEN>`
+Все запросы: заголовок `x-auth-token: <AUTH_TOKEN>`
 
 | Метод | Путь | Описание |
 |-------|------|----------|
@@ -216,14 +178,6 @@ mtg-adminpanel/
 | POST | `/api/nodes/:id/users/:name/stop` | Остановить |
 | POST | `/api/nodes/:id/users/:name/start` | Запустить |
 | GET | `/api/status` | Статус всех нод |
-
----
-
-## Безопасность
-
-- `data/` и `ssh_keys/` в `.gitignore` — никогда не попадут в репо
-- `AUTH_TOKEN` хранится в `.env` — не коммитить
-- Рекомендуется закрыть порт `3000` и использовать только через reverse proxy с SSL
 
 ---
 
