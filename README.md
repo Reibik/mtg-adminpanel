@@ -2,7 +2,7 @@
 
 Веб-панель для управления MTProto прокси ([mtg v2](https://github.com/9seconds/mtg)) на нескольких серверах через SSH.
 
-![Stack](https://img.shields.io/badge/Node.js-20-green) ![Docker](https://img.shields.io/badge/Docker-Compose-blue) ![SQLite](https://img.shields.io/badge/DB-SQLite-lightgrey) ![License](https://img.shields.io/badge/License-MIT-yellow) ![Version](https://img.shields.io/badge/version-1.2.0-cyan)
+![Stack](https://img.shields.io/badge/Node.js-20-green) ![Docker](https://img.shields.io/badge/Docker-Compose-blue) ![SQLite](https://img.shields.io/badge/DB-SQLite-lightgrey) ![License](https://img.shields.io/badge/License-MIT-yellow) ![Version](https://img.shields.io/badge/version-1.4.1-cyan)
 
 ---
 
@@ -11,16 +11,18 @@
 - 🖥️ Управление несколькими нодами из одного интерфейса
 - ➕ Добавление нод через веб — SSH пароль или ключ
 - 👥 Создание юзеров с уникальной ссылкой `tg://proxy`
-- 📊 Трафик входящий/исходящий по каждому юзеру (обновляется каждые 30 сек)
+- 📱 QR-код для каждого юзера — открой и отсканируй прямо в панели
+- 📊 Трафик входящий/исходящий по каждому юзеру
 - 📈 График подключений за последние 24 часа
 - ⏱️ Дата истечения доступа с автоудалением по расписанию
 - 🚦 Лимит трафика на юзера
 - 📝 Заметка к юзеру (например "Иван, оплатил до 01.04")
 - ✏️ Редактирование юзера без пересоздания
-- 🔄 Проверка версии mtg и обновление одной кнопкой
 - ⏸️ Остановка / запуск отдельных юзеров
 - 🔗 Копирование ссылки одним кликом
 - 📋 Единая таблица всех юзеров со всех нод
+- 🔐 Двухфакторная аутентификация (TOTP / Google Authenticator)
+- 📱 Адаптивный интерфейс для мобильных устройств
 
 ---
 
@@ -124,6 +126,18 @@ DATA_DIR=/data                 # путь к базе данных
 
 ---
 
+## 🔐 Двухфакторная аутентификация
+
+1. Открой панель → **Настройки**
+2. Нажми **Включить 2FA**
+3. Отсканируй QR-код в Google Authenticator (или любом TOTP-приложении)
+4. Введи 6-значный код для подтверждения
+5. При следующем входе после токена появится второй шаг с вводом кода
+
+> Реализовано на встроенном Node.js `crypto` — без внешних зависимостей.
+
+---
+
 ## Добавление ноды
 
 1. Открой панель → **Ноды** → **Добавить ноду**
@@ -141,9 +155,9 @@ DATA_DIR=/data                 # путь к базе данных
 ## Управление контейнером
 
 ```bash
-docker logs mtg-panel -f                    # логи
-docker restart mtg-panel                    # перезапуск
-cd /opt/mtg-adminpanel && docker compose down   # остановка
+docker logs mtg-panel -f                                             # логи
+docker restart mtg-panel                                             # перезапуск
+cd /opt/mtg-adminpanel && docker compose down                        # остановка
 cd /opt/mtg-adminpanel && git pull && docker compose up -d --build  # обновление
 ```
 
@@ -162,7 +176,8 @@ mtg-adminpanel/
 │   └── src/
 │       ├── app.js      # Express API
 │       ├── db.js       # SQLite
-│       └── ssh.js      # SSH управление нодами
+│       ├── ssh.js      # SSH управление нодами
+│       └── totp.js     # TOTP 2FA (без зависимостей)
 ├── public/
 │   └── index.html      # React SPA
 ├── data/               # БД (в .gitignore)
@@ -183,8 +198,6 @@ mtg-adminpanel/
 | DELETE | `/api/nodes/:id` | Удалить ноду |
 | GET | `/api/nodes/:id/check` | Ping ноды |
 | GET | `/api/nodes/:id/traffic` | Трафик юзеров |
-| GET | `/api/nodes/:id/mtg-version` | Версия mtg |
-| POST | `/api/nodes/:id/mtg-update` | Обновить mtg |
 | GET | `/api/nodes/:id/users` | Список юзеров |
 | POST | `/api/nodes/:id/users` | Добавить юзера |
 | PUT | `/api/nodes/:id/users/:name` | Редактировать юзера |
@@ -193,6 +206,10 @@ mtg-adminpanel/
 | POST | `/api/nodes/:id/users/:name/start` | Запустить |
 | GET | `/api/nodes/:id/users/:name/history` | История подключений |
 | GET | `/api/status` | Статус всех нод |
+| GET | `/api/totp/status` | Статус 2FA |
+| POST | `/api/totp/setup` | Настроить 2FA |
+| POST | `/api/totp/verify` | Включить 2FA |
+| POST | `/api/totp/disable` | Отключить 2FA |
 
 ---
 
