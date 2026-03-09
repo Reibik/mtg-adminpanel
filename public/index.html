@@ -1480,10 +1480,10 @@ function SettingsPage() {
               2. Нажми "+" → "Сканировать QR-код"<br/>
               3. Введи 6-значный код для подтверждения
             </div>
-            <div style={{textAlign:'center',marginBottom:16}}>
-              <div style={{display:'inline-block',padding:12,background:'#fff',borderRadius:12}}>
-                <img src={setupData.qr} alt="QR" style={{width:200,height:200,display:'block'}}/>
-              </div>
+            <div style={{textAlign:"center",marginBottom:16}}>
+              <div id="totp-qr-container" style={{display:"inline-block",padding:12,background:"#fff",borderRadius:12}}
+                ref={el => { if (el && el.children.length === 0) { new QRCode(el, { text: setupData.qr, width: 200, height: 200, correctLevel: QRCode.CorrectLevel.M }); } }}
+              />
             </div>
             <div style={{
               background:'var(--bg3)',border:'1px solid var(--border)',
