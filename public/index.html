@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
@@ -742,7 +742,7 @@ function parseVer(raw) {
   return { name: raw.slice(0,20), date: null };
 }
 
-const PANEL_VERSION_FALLBACK = 'v1.6.0';
+const PANEL_VERSION_FALLBACK = 'v1.6.0'; // fallback if API unavailable
 
 function VersionBlock({ nodes }) {
   const [versions, setVersions] = useState({});
@@ -751,6 +751,7 @@ function VersionBlock({ nodes }) {
   const [open, setOpen] = useState(false);
   const [latestRelease, setLatestRelease] = useState(null);
   const [checkingRelease, setCheckingRelease] = useState(false);
+  const [panelVersion, setPanelVersion] = useState(null); // loaded from /api/version
 
   const checkVersions = useCallback(async () => {
     if(!nodes.length) return;
@@ -778,6 +779,13 @@ function VersionBlock({ nodes }) {
 
   useEffect(() => { if(nodes.length) checkVersions(); }, [nodes.length]);
   useEffect(() => { if(open && !latestRelease) checkLatestRelease(); }, [open]);
+
+  // Load panel version from backend
+  useEffect(() => {
+    api('GET', '/api/version')
+      .then(r => setPanelVersion(r.version ? (r.version.startsWith('v') ? r.version : `v${r.version}`) : PANEL_VERSION_FALLBACK))
+      .catch(() => setPanelVersion(PANEL_VERSION_FALLBACK));
+  }, []);
 
   const updateNode = async (node) => {
     setUpdating(u => ({...u, [node.id]: true}));
@@ -835,11 +843,11 @@ function VersionBlock({ nodes }) {
                     <div>
                       <div style={{fontWeight:600,fontSize:13}}>MTG AdminPanel</div>
                       <div style={{fontSize:11,color:'var(--t3)',fontFamily:'var(--mono)',marginTop:3,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-                        <span>Установлена: <span style={{color:'var(--vi)'}}>{PANEL_VERSION}</span></span>
+                        <span>Установлена: <span style={{color:'var(--vi)'}}>{panelVersion || '...'}</span></span>
                         {checkingRelease
                           ? <span style={{color:'var(--t3)',display:'inline-flex',alignItems:'center',gap:4}}><span className="spin spin-sm" style={{width:9,height:9}}/> проверяю...</span>
-                          : latestRelease
-                            ? latestRelease.tag !== PANEL_VERSION
+                          : latestRelease && panelVersion
+                            ? latestRelease.tag !== panelVersion
                               ? <span className="badge badge-amber" style={{fontSize:10}}>↑ новая {latestRelease.tag}</span>
                               : <span className="badge badge-green" style={{fontSize:10}}>актуальная</span>
                             : null
@@ -848,7 +856,7 @@ function VersionBlock({ nodes }) {
                     </div>
                   </div>
                   <div style={{display:'flex',gap:8,flexShrink:0}}>
-                    {latestRelease && latestRelease.tag !== PANEL_VERSION && (
+                    {latestRelease && panelVersion && latestRelease.tag !== panelVersion && (
                       <a href={latestRelease.url} target="_blank" className="btn btn-primary btn-sm" style={{textDecoration:'none'}}>
                         <I.Download/> {latestRelease.tag}
                       </a>
@@ -1881,4 +1889,3 @@ ReactDOM.createRoot(document.getElementById('app')).render(<App/>);
 </script>
 </body>
 </html>
-

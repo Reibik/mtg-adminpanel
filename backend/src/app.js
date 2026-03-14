@@ -11,6 +11,11 @@ const authenticator = require('./totp');
 
 const app = express();
 
+// Public version endpoint
+let pkgVersion = "unknown";
+try { pkgVersion = require("../../package.json").version; } catch(e) {}
+app.get("/api/version", function(req, res) { res.json({ version: pkgVersion }); });
+
 // ── Public version endpoint (no auth required) ──
 let pkgVersion = 'unknown';
 try { pkgVersion = require('../../package.json').version; } catch(e) {}
@@ -364,5 +369,6 @@ app.listen(PORT, () => {
   setTimeout(recordHistory, 10000);
   setTimeout(cleanExpiredUsers, 5000);
 });
+
 
 
