@@ -735,12 +735,26 @@ function Login({ onLogin }) {
   );
 }
 
-/* ── Version Block ──────────────────────────────────────── */
 /* ── Version Block (sidebar btn + modal) ────────────────── */
+// Parse "mtg:2 | built 2026-02-28T14:06:37.762665Z" → { name:"mtg:2", date:"28 Feb 2026" }
+function parseVer(raw) {
+  if(!raw || raw === 'error' || raw === 'unknown') return { name: raw || '—', date: null };
+  const m = raw.match(/^([\w:.]+)\s*\|\s*built\s+([\d-T:.Z]+)/);
+  if(m) {
+    const d = new Date(m[2]);
+    const date = isNaN(d) ? null : d.toLocaleDateString('ru-RU', {day:'2-digit',month:'short',year:'numeric'});
+    return { name: m[1], date };
+  }
+  return { name: raw.slice(0,20), date: null };
+}
+
+const PANEL_VERSION = 'v1.5.0';
+
 function VersionBlock({ nodes }) {
-  const [versions, setVersions] = useState({});   // { nodeId: string }
-  const [updating, setUpdating] = useState({});   // { nodeId: bool }
+  const [versions, setVersions] = useState({});
+  const [updating, setUpdating] = useState({});
   const [checking, setChecking] = useState(false);
+  const [updatingPanel, setUpdatingPanel] = useState(false);
   const [open, setOpen] = useState(false);
 
   const checkVersions = useCallback(async () => {
@@ -764,68 +778,106 @@ function VersionBlock({ nodes }) {
     try {
       await api('POST', `/api/nodes/${node.id}/mtg-update`);
       toast(`${node.name}: MTG обновлён`, 'success');
-      setTimeout(checkVersions, 2000);
+      setTimeout(checkVersions, 3000);
     } catch(e) { toast(e.message, 'error'); }
     finally { setUpdating(u => ({...u, [node.id]: false})); }
   };
 
+  const updateAllNodes = async () => {
+    for(const n of nodes) await updateNode(n);
+  };
+
   if(!nodes.length) return null;
 
-  const vList = Object.values(versions);
+  // Derive clean sidebar label
+  const vList = Object.values(versions).map(parseVer);
   const hasData = vList.length > 0;
-  const allSame = hasData && vList.every(v => v === vList[0] && v !== 'error');
-  const anyError = vList.some(v => v === 'error');
-  const displayVer = !hasData ? null : (allSame ? vList[0] : anyError ? 'ошибка' : 'разные');
+  const names = [...new Set(vList.map(v => v.name).filter(v => v && v !== 'error' && v !== '—'))];
+  const sidebarTag = checking ? null : names.length === 1 ? names[0] : names.length > 1 ? 'разные' : null;
+  const anyError = Object.values(versions).some(v => v === 'error');
 
   return (
     <>
       <button className="version-sidebar-btn" onClick={() => setOpen(true)}>
         <I.Activity/>
-        MTG версия
+        Версии
         {checking
-          ? <span className="version-sidebar-tag load">...</span>
-          : displayVer
-            ? <span className={`version-sidebar-tag ${anyError?'warn':'ok'}`}>{displayVer.slice(0,20)}</span>
+          ? <span className="version-sidebar-tag load"><span className="spin spin-sm" style={{width:8,height:8}}/></span>
+          : sidebarTag
+            ? <span className={`version-sidebar-tag ${anyError?'warn':'ok'}`}>{sidebarTag}</span>
             : null
         }
       </button>
 
       {open && (
         <div className="overlay" onClick={e=>e.target===e.currentTarget&&setOpen(false)}>
-          <div className="modal" style={{maxWidth:560}}>
+          <div className="modal" style={{maxWidth:640}}>
             <div className="modal-head">
-              <div className="modal-title"><I.Activity/> MTG версии нод</div>
+              <div className="modal-title"><I.Activity/> Версии и обновления</div>
               <button className="modal-close" onClick={()=>setOpen(false)}><I.X/></button>
             </div>
-            <div className="modal-body" style={{padding:'0 0 4px'}}>
-              <table className="ver-table">
+
+            <div className="modal-body" style={{padding:'16px 20px'}}>
+
+              {/* Panel version row */}
+              <div style={{marginBottom:20,padding:'14px 16px',background:'var(--bg3)',borderRadius:10,border:'1px solid var(--b1)'}}>
+                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:12}}>
+                  <div style={{display:'flex',alignItems:'center',gap:10}}>
+                    <div style={{width:32,height:32,borderRadius:8,background:'var(--grad)',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                      <I.Zap/>
+                    </div>
+                    <div>
+                      <div style={{fontWeight:600,fontSize:13}}>MTG AdminPanel</div>
+                      <div style={{fontSize:11,color:'var(--t3)',fontFamily:'var(--mono)',marginTop:2}}>
+                        Текущая: <span style={{color:'var(--vi)'}}>{PANEL_VERSION}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <a href="https://github.com/MaksimTMB/mtg-adminpanel/releases" target="_blank"
+                    className="btn btn-ghost btn-sm" style={{textDecoration:'none'}}>
+                    <I.Download/> GitHub Releases
+                  </a>
+                </div>
+              </div>
+
+              {/* Nodes versions table */}
+              <div style={{fontSize:11,fontWeight:600,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'1px',marginBottom:10}}>
+                Версия MTG на нодах
+              </div>
+              <table className="ver-table" style={{tableLayout:'fixed',width:'100%'}}>
                 <thead>
                   <tr>
-                    <th>Нода</th>
-                    <th>Host</th>
-                    <th>Версия MTG</th>
-                    <th></th>
+                    <th style={{width:'22%'}}>Нода</th>
+                    <th style={{width:'28%'}}>Host</th>
+                    <th style={{width:'22%'}}>Версия</th>
+                    <th style={{width:'18%'}}>Дата сборки</th>
+                    <th style={{width:'10%'}}></th>
                   </tr>
                 </thead>
                 <tbody>
                   {nodes.map(n => {
-                    const ver = versions[n.id];
+                    const raw = versions[n.id];
+                    const parsed = raw ? parseVer(raw) : null;
                     const upd = updating[n.id];
                     return (
                       <tr key={n.id}>
-                        <td style={{fontWeight:600}}>{n.name}</td>
+                        <td style={{fontWeight:600,fontSize:13}}>{n.name}</td>
                         <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{n.host}</td>
                         <td>
-                          {!ver
-                            ? <span style={{color:'var(--t3)',fontSize:11}}>—</span>
-                            : ver === 'error'
-                              ? <span className="badge badge-red">ошибка</span>
-                              : <span className="badge badge-green" style={{fontFamily:'var(--mono)',fontSize:10}}>{ver.slice(0,40)}</span>
+                          {checking && !raw
+                            ? <span style={{color:'var(--t3)',fontSize:11}}>проверка...</span>
+                            : !raw
+                              ? <span style={{color:'var(--t3)',fontSize:11}}>—</span>
+                              : raw === 'error'
+                                ? <span className="badge badge-red">ошибка</span>
+                                : <span className="badge badge-green" style={{fontFamily:'var(--mono)'}}>{parsed.name}</span>
                           }
                         </td>
+                        <td style={{fontSize:11,color:'var(--t2)'}}>{parsed?.date || '—'}</td>
                         <td style={{textAlign:'right'}}>
-                          <button className="btn btn-primary btn-sm" onClick={()=>updateNode(n)} disabled={upd||!ver||ver==='error'}>
-                            {upd ? <><span className="spin spin-sm"/> Обновляю...</> : <><I.Download/> Обновить</>}
+                          <button className="btn btn-primary btn-sm" onClick={()=>updateNode(n)}
+                            disabled={upd||!raw||raw==='error'} style={{minWidth:80}}>
+                            {upd ? <><span className="spin spin-sm"/> ...</> : <><I.Download/> Update</>}
                           </button>
                         </td>
                       </tr>
@@ -834,11 +886,16 @@ function VersionBlock({ nodes }) {
                 </tbody>
               </table>
             </div>
+
             <div className="modal-foot">
               <button className="btn btn-ghost" onClick={checkVersions} disabled={checking}>
-                {checking ? <><span className="spin spin-sm"/> Проверяю...</> : <><I.RefreshCw/> Обновить версии</>}
+                {checking ? <><span className="spin spin-sm"/> Проверяю...</> : <><I.RefreshCw/> Проверить версии</>}
               </button>
-              <button className="btn btn-secondary" onClick={()=>setOpen(false)}>Закрыть</button>
+              <button className="btn btn-secondary" onClick={updateAllNodes}
+                disabled={Object.values(updating).some(Boolean)}>
+                <I.Download/> Обновить все ноды
+              </button>
+              <button className="btn btn-primary" onClick={()=>setOpen(false)}>Закрыть</button>
             </div>
           </div>
         </div>
@@ -1040,28 +1097,30 @@ function NodesPage({ nodes, onReload, onManage }) {
 
   const PingBadge = ({ nodeId }) => {
     const p = pings[nodeId];
-    if(!p && !p?.checking) return (
-      <span className="badge" style={{background:'var(--b1)',color:'var(--t3)'}}>
-        <span className="dot"/>—
-      </span>
-    );
-    if(p?.checking) return (
+    if(!p) return null; // nothing until first check runs
+    if(p.checking) return (
       <span className="badge" style={{background:'var(--b1)',color:'var(--t3)'}}>
         <span className="spin spin-sm"/> проверка
       </span>
     );
-    if(!p?.online) return (
+    if(!p.online) return (
       <span className="badge badge-red"><span className="dot"/>offline</span>
     );
     const ms = p.ms;
-    const msClass = ms < 100 ? '' : ms < 300 ? 'slow' : 'bad';
+    const msClass = ms < 200 ? '' : ms < 600 ? 'slow' : 'bad';
     return (
-      <span className="badge badge-green">
+      <span className="badge badge-green" title={`Отклик через SSH: ${ms}ms`}>
         <span className="dot dot-live"/>
         online<span className={`ping-ms ${msClass}`}>{ms}ms</span>
       </span>
     );
   };
+
+  // Auto-refresh ping every 2 minutes
+  useEffect(() => {
+    const t = setInterval(() => nodes.forEach(n => pingNode(n)), 120000);
+    return () => clearInterval(t);
+  }, [nodes.length]);
 
   return (
     <div className="pg">
@@ -1072,7 +1131,7 @@ function NodesPage({ nodes, onReload, onManage }) {
         </div>
         <div className="topbar-right">
           <button className="btn btn-ghost btn-sm" onClick={()=>nodes.forEach(n=>pingNode(n))}>
-            <I.Wifi/> Пинг всех
+            <I.Wifi/> Проверить отклик
           </button>
           <button className="btn btn-primary" onClick={()=>{setEdit(null);setModal(true);}}>
             <I.Plus/> Добавить ноду
@@ -1100,16 +1159,17 @@ function NodesPage({ nodes, onReload, onManage }) {
               {showInfo[node.id] && (
                 <div className="node-info-row">
                   <div>SSH: <span style={{color:'var(--t2)'}}>{node.ssh_user}@{node.host}:{node.ssh_port}</span></div>
-                  <div>Base: <span style={{color:'var(--t2)'}}>{node.base_dir}</span></div>
-                  <div>Port from: <span style={{color:'var(--t2)'}}>{node.start_port}</span></div>
+                  <div>Base dir: <span style={{color:'var(--t2)'}}>{node.base_dir}</span></div>
+                  <div>Start port: <span style={{color:'var(--t2)'}}>{node.start_port}</span></div>
                 </div>
               )}
 
               <div className="node-actions" style={{marginTop:14}}>
                 <button className="btn btn-primary btn-sm" onClick={()=>onManage(node)}><I.Users/> Юзеры</button>
-                <button className="btn btn-ghost btn-sm" onClick={()=>pingNode(node)} disabled={pings[node.id]?.checking}>
+                <button className="btn btn-ghost btn-sm" onClick={()=>pingNode(node)} disabled={pings[node.id]?.checking}
+                  title="Проверить отклик SSH">
                   {pings[node.id]?.checking ? <span className="spin spin-sm"/> : <I.Wifi/>}
-                  Пинг
+                  Отклик
                 </button>
                 <button className="btn btn-secondary btn-sm" onClick={()=>toggleInfo(node.id)}>
                   <I.Info/> {showInfo[node.id]?'Скрыть':'Инфо'}
@@ -1399,7 +1459,7 @@ function UsersPage({ node, onBack }) {
               </tr></thead>
               <tbody>
                 {users.map(u => (
-                  <tr key={u.id} style={{opacity:u.expired?.5:1}}>
+                  <tr key={u.id} style={{opacity:u.expired ? 0.5 : 1}}>
                     <td><span style={{fontFamily:'var(--mono)',fontWeight:600,fontSize:13}}>{u.name}</span></td>
                     <td><span className="badge badge-purple">{u.port}</span></td>
                     <td>
@@ -1644,7 +1704,7 @@ function App() {
 
   const NAV = [
     { id:'dashboard', icon:<I.LayoutDash/>, label:'Дашборд' },
-    { id:'nodes',     icon:<I.Server/>,     label:'Ноды', count: nodes.length },
+    { id:'nodes',     icon:<I.Server/>,     label:'Ноды' },
     { id:'users',     icon:<I.Users/>,      label:'Юзеры' },
     { id:'settings',  icon:<I.Settings/>,   label:'Настройки' },
   ];
@@ -1667,7 +1727,6 @@ function App() {
           {NAV.map(item => (
             <div key={item.id} className={`nav-item ${page===item.id?'active':''}`} onClick={()=>nav(item.id)}>
               {item.icon}{item.label}
-              {item.count!=null && <span className="nav-badge">{item.count}</span>}
             </div>
           ))}
         </nav>
