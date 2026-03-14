@@ -31,3 +31,4 @@ bash <(curl -fsSL https://raw.githubusercontent.com/MaksimTMB/mtg-adminpanel/mai
 
 ### v1.5.0
 - Синхронизация клиентов, 2FA, QR-коды
+
