@@ -158,13 +158,7 @@ body {
 .ver-table tr:last-child td { border-bottom: none; }
 .ver-table tbody tr:hover td { background: rgba(124,111,247,0.04); }
 
-/* ping badge inline */
-.ping-ms {
-  font-size: 10px; font-family: var(--mono); font-weight: 600;
-  color: var(--gr); margin-left: 5px; opacity: .85;
-}
-.ping-ms.slow { color: var(--am); }
-.ping-ms.bad  { color: var(--re); }
+/* node status badge checked via SSH every 20s */
 
 /* node info tooltip */
 .node-info-row {
@@ -867,9 +861,12 @@ function VersionBlock({ nodes }) {
                 </div>
               </div>
 
-              {/* Nodes versions table */}
               <div style={{fontSize:11,fontWeight:600,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'1px',marginBottom:8}}>
                 MTG прокси на нодах
+              </div>
+              <div style={{fontSize:11,color:'var(--t3)',marginBottom:12,padding:'8px 12px',background:'var(--bg3)',borderRadius:8,border:'1px solid var(--b1)'}}>
+                <I.Info style={{width:11,height:11,marginRight:5,verticalAlign:'middle'}}/>
+                Update = <code style={{fontFamily:'var(--mono)',color:'var(--t2)'}}>docker pull ninесекунд/mtg:2</code> — скачивает последний патч образа
               </div>
               <table className="ver-table" style={{tableLayout:'fixed',width:'100%'}}>
                 <colgroup>
@@ -883,8 +880,8 @@ function VersionBlock({ nodes }) {
                   <tr>
                     <th>Нода</th>
                     <th>Host</th>
-                    <th>Версия</th>
-                    <th>Дата сборки</th>
+                    <th>Образ</th>
+                    <th>Собран</th>
                     <th style={{textAlign:'right'}}>Обновить</th>
                   </tr>
                 </thead>
@@ -904,14 +901,15 @@ function VersionBlock({ nodes }) {
                               ? <span style={{color:'var(--t3)',fontSize:11}}>—</span>
                               : raw === 'error'
                                 ? <span className="badge badge-red">ошибка</span>
-                                : <span className="badge badge-green" style={{fontFamily:'var(--mono)'}}>{parsed.name}</span>
+                                : <span className="badge badge-blue" style={{fontFamily:'var(--mono)'}}>{parsed.name}</span>
                           }
                         </td>
                         <td style={{fontSize:11,color:'var(--t2)'}}>{parsed?.date || '—'}</td>
                         <td style={{textAlign:'right'}}>
-                          <button className="btn btn-secondary btn-sm" onClick={()=>updateNode(n)}
-                            disabled={upd||!raw||raw==='error'}>
-                            {upd ? <><span className="spin spin-sm"/> ...</> : <><I.Download/> Update</>}
+                          <button className="btn btn-ghost btn-sm" onClick={()=>updateNode(n)}
+                            disabled={upd||!raw||raw==='error'}
+                            title="docker pull ninесекунд/mtg:2 — скачать последний патч">
+                            {upd ? <><span className="spin spin-sm"/> ...</> : <><I.Download/> pull</>}
                           </button>
                         </td>
                       </tr>
@@ -1100,25 +1098,25 @@ function NodeModal({ node, onClose, onSave }) {
 function NodesPage({ nodes, onReload, onManage }) {
   const [modal, setModal] = useState(false);
   const [edit, setEdit] = useState(null);
-  const [pings, setPings] = useState({});      // { nodeId: { ms, online, checking } }
-  const [showInfo, setShowInfo] = useState({}); // { nodeId: bool }
+  const [pings, setPings] = useState({});
+  const [showInfo, setShowInfo] = useState({});
 
-  // Measure real ping with Date.now() delta
-  const pingNode = useCallback(async (node) => {
+  // SSH check — measures connection establishment time, NOT network latency
+  const checkNode = useCallback(async (node) => {
     setPings(p => ({...p, [node.id]: {...(p[node.id]||{}), checking: true}}));
-    const t0 = Date.now();
     try {
       const r = await api('GET', `/api/nodes/${node.id}/check`);
-      const ms = Date.now() - t0;
-      setPings(p => ({...p, [node.id]: { online: r.online, ms, checking: false }}));
+      setPings(p => ({...p, [node.id]: { online: r.online, checking: false }}));
     } catch {
-      setPings(p => ({...p, [node.id]: { online: false, ms: null, checking: false }}));
+      setPings(p => ({...p, [node.id]: { online: false, checking: false }}));
     }
   }, []);
 
-  // Auto-ping all nodes on mount
+  // Auto-check on mount + every 20 seconds
   useEffect(() => {
-    nodes.forEach(n => pingNode(n));
+    nodes.forEach(n => checkNode(n));
+    const t = setInterval(() => nodes.forEach(n => checkNode(n)), 20000);
+    return () => clearInterval(t);
   }, [nodes.length]);
 
   const del = async (node) => {
@@ -1129,32 +1127,29 @@ function NodesPage({ nodes, onReload, onManage }) {
 
   const toggleInfo = (id) => setShowInfo(s => ({...s, [id]: !s[id]}));
 
-  const PingBadge = ({ nodeId }) => {
+  const StatusBadge = ({ nodeId }) => {
     const p = pings[nodeId];
-    if(!p) return null; // nothing until first check runs
-    if(p.checking) return (
+    if(!p) return (
       <span className="badge" style={{background:'var(--b1)',color:'var(--t3)'}}>
-        <span className="spin spin-sm"/> проверка
+        <span className="spin spin-sm" style={{width:9,height:9}}/> проверка
+      </span>
+    );
+    if(p.checking && !p.online && p.online !== false) return (
+      <span className="badge" style={{background:'var(--b1)',color:'var(--t3)'}}>
+        <span className="spin spin-sm" style={{width:9,height:9}}/> проверка
       </span>
     );
     if(!p.online) return (
       <span className="badge badge-red"><span className="dot"/>offline</span>
     );
-    const ms = p.ms;
-    const msClass = ms < 200 ? '' : ms < 600 ? 'slow' : 'bad';
     return (
-      <span className="badge badge-green" title={`Отклик через SSH: ${ms}ms`}>
-        <span className="dot dot-live"/>
-        online<span className={`ping-ms ${msClass}`}>{ms}ms</span>
+      <span className="badge badge-green" title="SSH соединение установлено">
+        <span className={`dot ${p.checking?'':'dot-live'}`}/>
+        online
+        {p.checking && <span className="spin spin-sm" style={{width:9,height:9,marginLeft:4,borderTopColor:'var(--gr)'}}/>}
       </span>
     );
   };
-
-  // Auto-refresh ping every 2 minutes
-  useEffect(() => {
-    const t = setInterval(() => nodes.forEach(n => pingNode(n)), 120000);
-    return () => clearInterval(t);
-  }, [nodes.length]);
 
   return (
     <div className="pg">
@@ -1164,9 +1159,6 @@ function NodesPage({ nodes, onReload, onManage }) {
           <div className="page-desc">{nodes.length} серверов настроено</div>
         </div>
         <div className="topbar-right">
-          <button className="btn btn-ghost btn-sm" onClick={()=>nodes.forEach(n=>pingNode(n))}>
-            <I.Wifi/> Проверить отклик
-          </button>
           <button className="btn btn-primary" onClick={()=>{setEdit(null);setModal(true);}}>
             <I.Plus/> Добавить ноду
           </button>
@@ -1187,7 +1179,7 @@ function NodesPage({ nodes, onReload, onManage }) {
                     <div className="node-host">{node.host}</div>
                   </div>
                 </div>
-                <PingBadge nodeId={node.id}/>
+                <StatusBadge nodeId={node.id}/>
               </div>
 
               {showInfo[node.id] && (
@@ -1200,11 +1192,6 @@ function NodesPage({ nodes, onReload, onManage }) {
 
               <div className="node-actions" style={{marginTop:14}}>
                 <button className="btn btn-primary btn-sm" onClick={()=>onManage(node)}><I.Users/> Юзеры</button>
-                <button className="btn btn-ghost btn-sm" onClick={()=>pingNode(node)} disabled={pings[node.id]?.checking}
-                  title="Проверить отклик SSH">
-                  {pings[node.id]?.checking ? <span className="spin spin-sm"/> : <I.Wifi/>}
-                  Отклик
-                </button>
                 <button className="btn btn-secondary btn-sm" onClick={()=>toggleInfo(node.id)}>
                   <I.Info/> {showInfo[node.id]?'Скрыть':'Инфо'}
                 </button>
