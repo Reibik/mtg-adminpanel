@@ -970,22 +970,22 @@ function Dashboard({ nodes, onSelectNode }) {
         <div className="stat-card">
           <div className="stat-top"><div className="stat-icon vi"><I.Network/></div></div>
           <div className="stat-val vi">{nodes.length}</div>
-          <div className="stat-lbl">Всего нод</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-top"><div className="stat-icon gr"><I.Wifi/></div></div>
-          <div className="stat-val gr">{online}</div>
-          <div className="stat-lbl">Нод онлайн</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-top"><div className="stat-icon am"><I.Activity/></div></div>
-          <div className="stat-val am">{containers}</div>
-          <div className="stat-lbl">Активных прокси</div>
+          <div className="stat-lbl">Нод всего / онлайн <span style={{color:'var(--gr)'}}>{online}</span></div>
         </div>
         <div className="stat-card">
           <div className="stat-top"><div className="stat-icon cy"><I.Users/></div></div>
           <div className="stat-val cy">{totalUsers}</div>
-          <div className="stat-lbl">Всего юзеров</div>
+          <div className="stat-lbl">Клиентов всего</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-top"><div className="stat-icon gr"><I.Activity/></div></div>
+          <div className="stat-val gr">{containers}</div>
+          <div className="stat-lbl">Активных прокси</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-top"><div className="stat-icon am"><I.Wifi/></div></div>
+          <div className="stat-val am">{online}/{nodes.length}</div>
+          <div className="stat-lbl">Нод доступно</div>
         </div>
       </div>
 
@@ -995,7 +995,7 @@ function Dashboard({ nodes, onSelectNode }) {
           {nodes.map(node => {
             const s = status.find(x=>x.id===node.id)||{};
             return (
-              <div className="node-card" key={node.id} onClick={()=>onSelectNode(node)}>
+              <div className="node-card" key={node.id} onClick={()=>onSelectNode(node)} style={{cursor:'pointer'}}>
                 <div className="node-head">
                   <div style={{display:'flex',alignItems:'center',gap:12}}>
                     <div className="node-icon"><I.Server/></div>
@@ -1009,19 +1009,17 @@ function Dashboard({ nodes, onSelectNode }) {
                     {s.online?'online':'offline'}
                   </span>
                 </div>
-                <div className="node-stats">
-                  <div>
-                    <div className="node-stat-lbl">Юзеров</div>
-                    <div className="node-stat-val">{node._userCount||0}</div>
+                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginTop:14}}>
+                  <div style={{display:'flex',gap:8}}>
+                    <span className="badge badge-purple" title="Всего клиентов">
+                      <I.Users style={{width:10,height:10}}/> {node._userCount||0}
+                    </span>
+                    {s.containers > 0 && (
+                      <span className="badge badge-green" title="Активных прокси">{s.containers} active</span>
+                    )}
                   </div>
-                  <div>
-                    <div className="node-stat-lbl">Активных</div>
-                    <div className="node-stat-val">{s.containers||0}</div>
-                  </div>
-                </div>
-                <div className="node-actions">
                   <button className="btn btn-primary btn-sm" onClick={e=>{e.stopPropagation();onSelectNode(node);}}>
-                    <I.Users/> Клиенты {node._userCount > 0 ? <span style={{marginLeft:4,background:'rgba(255,255,255,0.2)',borderRadius:4,padding:'0 5px',fontSize:11}}>{node._userCount}</span> : null}
+                    Клиенты →
                   </button>
                 </div>
               </div>
@@ -1190,7 +1188,11 @@ function NodesPage({ nodes, onReload, onManage }) {
               )}
 
               <div className="node-actions" style={{marginTop:14}}>
-                <button className="btn btn-primary btn-sm" onClick={()=>onManage(node)}><I.Users/> Клиенты</button>
+                <button className="btn btn-primary btn-sm" onClick={()=>onManage(node)}>
+                  <I.Users/>
+                  Клиенты
+                  {node._userCount > 0 && <span style={{marginLeft:4,background:'rgba(255,255,255,0.18)',borderRadius:4,padding:'1px 6px',fontSize:11,fontWeight:600}}>{node._userCount}</span>}
+                </button>
                 <button className="btn btn-secondary btn-sm" onClick={()=>toggleInfo(node.id)}>
                   <I.Info/> {showInfo[node.id]?'Скрыть':'Инфо'}
                 </button>
@@ -1552,8 +1554,14 @@ function AllUsers({ nodes, onSelectNode }) {
     if(silent) setRefreshing(true); else setLoading(true);
     try {
       const res = await Promise.all(nodes.map(async n => {
-        try { const u = await api('GET',`/api/nodes/${n.id}/users`); return [n.id, u]; }
-        catch { return [n.id, []]; }
+        try {
+          const [users, traffic] = await Promise.all([
+            api('GET', `/api/nodes/${n.id}/users`),
+            api('GET', `/api/nodes/${n.id}/traffic`).catch(() => ({}))
+          ]);
+          // Merge traffic into each user
+          return [n.id, users.map(u => ({...u, traffic: traffic[u.name] || null}))];
+        } catch { return [n.id, []]; }
       }));
       setGroups(Object.fromEntries(res));
     } finally { setLoading(false); setRefreshing(false); }
