@@ -27,9 +27,10 @@ def get_mtg_containers():
 
 def get_connections(container) -> int:
     """
-    MTG образ на scratch — нет shell/cat внутри контейнера.
-    Используем nsenter для входа в network namespace контейнера
-    и читаем /proc/net/tcp6 напрямую с хоста.
+    Считать ESTABLISHED соединения к контейнеру.
+    Читаем /proc/{pid}/net/tcp6 из namespace контейнера.
+    IPv4-mapped соединения видны только в tcp6 (::ffff:ip:port).
+    Читаем ТОЛЬКО tcp6 чтобы избежать двойного счёта.
     """
     try:
         container.reload()
@@ -37,24 +38,17 @@ def get_connections(container) -> int:
         if not pid:
             return 0
 
-        # Читаем tcp6 из network namespace контейнера через nsenter
-        # Агент запущен с network_mode: host и имеет доступ к /proc хоста
         tcp6_path = f"/proc/{pid}/net/tcp6"
-        tcp_path  = f"/proc/{pid}/net/tcp"
-
-        count = 0
-        for fpath in [tcp6_path, tcp_path]:
-            try:
-                with open(fpath) as f:
-                    lines = f.readlines()[1:]  # skip header
-                for line in lines:
-                    parts = line.split()
-                    if len(parts) >= 4 and parts[3] == "01":  # ESTABLISHED
-                        count += 1
-            except Exception:
-                continue
-
-        return count
+        try:
+            with open(tcp6_path) as f:
+                lines = f.readlines()[1:]  # skip header
+            return sum(1 for l in lines if len(l.split()) >= 4 and l.split()[3] == "01")
+        except Exception:
+            # fallback: tcp only if tcp6 not available
+            tcp_path = f"/proc/{pid}/net/tcp"
+            with open(tcp_path) as f:
+                lines = f.readlines()[1:]
+            return sum(1 for l in lines if len(l.split()) >= 4 and l.split()[3] == "01")
     except Exception:
         return 0
 
