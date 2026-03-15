@@ -27,10 +27,10 @@ def get_mtg_containers():
 
 def get_connections(container) -> int:
     """
-    Считать ESTABLISHED соединения к контейнеру.
+    Считать входящие ESTABLISHED соединения клиентов к прокси.
     Читаем /proc/{pid}/net/tcp6 из namespace контейнера.
-    IPv4-mapped соединения видны только в tcp6 (::ffff:ip:port).
-    Читаем ТОЛЬКО tcp6 чтобы избежать двойного счёта.
+    Фильтруем: только где local_port == 3128 (0C38) и state == ESTABLISHED (01).
+    Исходящие к Telegram (149.154.x, 91.108.x) не считаем.
     """
     try:
         container.reload()
@@ -38,17 +38,29 @@ def get_connections(container) -> int:
         if not pid:
             return 0
 
+        MTG_PORT_HEX = "0C38"  # 3128 in hex
+
         tcp6_path = f"/proc/{pid}/net/tcp6"
         try:
             with open(tcp6_path) as f:
                 lines = f.readlines()[1:]  # skip header
-            return sum(1 for l in lines if len(l.split()) >= 4 and l.split()[3] == "01")
         except Exception:
-            # fallback: tcp only if tcp6 not available
             tcp_path = f"/proc/{pid}/net/tcp"
             with open(tcp_path) as f:
                 lines = f.readlines()[1:]
-            return sum(1 for l in lines if len(l.split()) >= 4 and l.split()[3] == "01")
+
+        count = 0
+        for line in lines:
+            parts = line.split()
+            if len(parts) < 4:
+                continue
+            state = parts[3]
+            local_addr = parts[1]  # format: XXXXXXXX:PORT
+            local_port = local_addr.split(":")[1] if ":" in local_addr else ""
+            # Only count ESTABLISHED incoming connections to MTG port 3128
+            if state == "01" and local_port == MTG_PORT_HEX:
+                count += 1
+        return count
     except Exception:
         return 0
 
