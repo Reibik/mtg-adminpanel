@@ -28,29 +28,24 @@ def get_mtg_containers():
 def get_connections(container) -> int:
     """
     Считать активные соединения к контейнеру.
-    Агент запущен с network_mode: host — видит все соединения хоста.
-    Фильтруем по внутреннему IP контейнера в bridge сети.
+    Агент в host network — читает /proc/net/tcp хоста.
+    Фильтрует по published host port контейнера (в hex little-endian).
     """
     try:
         container.reload()
-        # Получаем внутренний IP контейнера в bridge сети
-        networks = container.attrs.get("NetworkSettings", {}).get("Networks", {})
-        container_ip = None
-        for net in networks.values():
-            ip = net.get("IPAddress")
-            if ip:
-                container_ip = ip
+        # Получаем published host port из bindings
+        ports = container.attrs.get("NetworkSettings", {}).get("Ports", {})
+        host_port = None
+        for bindings in ports.values():
+            if bindings:
+                host_port = int(bindings[0].get("HostPort", 0))
                 break
 
-        if not container_ip:
+        if not host_port:
             return 0
 
-        # Читаем /proc/net/tcp и /proc/net/tcp6 с хоста (агент в host network)
-        # IP контейнера в little-endian hex: 172.18.0.x
-        import socket, struct
-        # Convert IP to little-endian hex as in /proc/net/tcp
-        packed = socket.inet_aton(container_ip)
-        le_hex = struct.pack('<I', struct.unpack('>I', packed)[0]).hex().upper()
+        # Конвертируем порт в hex (big-endian, uppercase) как в /proc/net/tcp
+        port_hex = format(host_port, '04X')
 
         count = 0
         for fname in ['/proc/net/tcp', '/proc/net/tcp6']:
@@ -60,11 +55,11 @@ def get_connections(container) -> int:
                         parts = line.split()
                         if len(parts) < 4:
                             continue
+                        local_addr = parts[1]   # format: XXXXXXXX:PPPP
                         state = parts[3]
-                        remote_addr = parts[2]  # remote address:port
-                        local_addr = parts[1]   # local address:port
-                        # ESTABLISHED=01, SYN_RECV=02
-                        if state in ('01', '02') and le_hex in local_addr:
+                        local_port = local_addr.split(':')[1] if ':' in local_addr else ''
+                        # ESTABLISHED=01
+                        if state == '01' and local_port == port_hex:
                             count += 1
             except Exception:
                 continue
