@@ -27,43 +27,25 @@ def get_mtg_containers():
 
 def get_connections(container) -> int:
     """
-    Считать активные соединения к контейнеру.
-    Агент в host network — читает /proc/net/tcp хоста.
-    Фильтрует по published host port контейнера (в hex little-endian).
+    Считать ESTABLISHED соединения к контейнеру.
+    Читаем /proc/net/tcp6 из namespace контейнера через docker exec.
+    Соединения к MTG идут по IPv4-mapped IPv6: ::ffff:container_ip:3128
     """
     try:
-        container.reload()
-        # Получаем published host port из bindings
-        ports = container.attrs.get("NetworkSettings", {}).get("Ports", {})
-        host_port = None
-        for bindings in ports.values():
-            if bindings:
-                host_port = int(bindings[0].get("HostPort", 0))
-                break
+        # Читаем tcp6 из namespace контейнера — там видны все клиентские соединения
+        result = container.exec_run("cat /proc/net/tcp6", demux=False)
+        if result.exit_code != 0:
+            # fallback to tcp
+            result = container.exec_run("cat /proc/net/tcp", demux=False)
+            if result.exit_code != 0:
+                return 0
 
-        if not host_port:
-            return 0
-
-        # Конвертируем порт в hex (big-endian, uppercase) как в /proc/net/tcp
-        port_hex = format(host_port, '04X')
-
+        output = result.output.decode("utf-8", errors="ignore")
         count = 0
-        for fname in ['/proc/net/tcp', '/proc/net/tcp6']:
-            try:
-                with open(fname) as f:
-                    for line in f.readlines()[1:]:  # skip header
-                        parts = line.split()
-                        if len(parts) < 4:
-                            continue
-                        local_addr = parts[1]   # format: XXXXXXXX:PPPP
-                        state = parts[3]
-                        local_port = local_addr.split(':')[1] if ':' in local_addr else ''
-                        # ESTABLISHED=01
-                        if state == '01' and local_port == port_hex:
-                            count += 1
-            except Exception:
-                continue
-
+        for line in output.strip().split("\n")[1:]:  # skip header
+            parts = line.split()
+            if len(parts) >= 4 and parts[3] == "01":  # ESTABLISHED
+                count += 1
         return count
     except Exception:
         return 0
