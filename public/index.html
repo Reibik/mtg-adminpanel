@@ -741,7 +741,39 @@ const COUNTRIES = [
   {code:'sg',name:'Сингапур'},{code:'au',name:'Австралия'},{code:'ca',name:'Канада'},
   {code:'kz',name:'Казахстан'},{code:'am',name:'Армения'},{code:'ge',name:'Грузия'},
 ];
-const flagUrl = (code) => code ? `https://flagcdn.com/20x15/${code}.png` : null;
+const flagUrl = (code, size='w40') => code ? `https://flagcdn.com/${size}/${code}.png` : null;
+
+/* ── Shared UI components ───────────────────────────────── */
+function expiryBadge(expires_at, small) {
+  if(!expires_at) return <span style={{color:'var(--t3)',fontSize:small?11:12}}>∞</span>;
+  const d = Math.floor((new Date(expires_at) - new Date()) / 86400000);
+  if(d < 0) return <span className="badge badge-red">истёк</span>;
+  return <span style={{fontFamily:'var(--mono)',fontSize:small?11:12,color:d<3?'var(--am)':'var(--t2)'}}>{d}д</span>;
+}
+function StatPill({count, label, color, dot, large}) {
+  const sz = large ? {num:26, lbl:11, pad:'12px 18px', r:12} : {num:14, lbl:11, pad:'5px 11px', r:8};
+  return (
+    <div style={{display:'flex', flexDirection: large?'column':'row', alignItems:'center', gap: large?4:5,
+      background:`rgba(${color},0.1)`, borderRadius:sz.r, padding:sz.pad,
+      whiteSpace:'nowrap', flex: large?1:undefined, minWidth: large?80:undefined}}>
+      {large ? (
+        <>
+          <div style={{display:'flex',alignItems:'center',gap:5}}>
+            {dot && <span className={`dot ${dot}`}/>}
+            <span style={{fontSize:sz.num,fontWeight:800,letterSpacing:'-1px',color:`rgb(${color})`}}>{count}</span>
+          </div>
+          <span style={{fontSize:sz.lbl,color:'var(--t3)',fontWeight:500}}>{label}</span>
+        </>
+      ) : (
+        <>
+          {dot && <span className={`dot ${dot}`}/>}
+          <span style={{fontSize:sz.num,fontWeight:700,color:`rgb(${color})`}}>{count}</span>
+          <span style={{fontSize:sz.lbl,color:'var(--t3)'}}>{label}</span>
+        </>
+      )}
+    </div>
+  );
+}
 
 function FlagPicker({ value, onChange }) {
   const [open, setOpen] = useState(false);
@@ -752,7 +784,7 @@ function FlagPicker({ value, onChange }) {
         onClick={()=>setOpen(!open)}>
         {current ? (
           <>
-            <img src={flagUrl(current.code)} alt={current.code} style={{width:20,height:15,objectFit:'cover',borderRadius:2}}/>
+            <img src={flagUrl(current.code,'w40')} alt={current.code} style={{width:24,height:18,objectFit:'cover',borderRadius:2}}/>
             <span style={{fontSize:13,color:'var(--t1)'}}>{current.name}</span>
           </>
         ) : (
@@ -772,7 +804,7 @@ function FlagPicker({ value, onChange }) {
               <div key={c.code}
                 style={{display:'flex',flexDirection:'column',alignItems:'center',gap:3,padding:'6px 4px',borderRadius:7,cursor:'pointer',border:`1px solid ${value===c.code?'rgba(124,111,247,.4)':'transparent'}`,background:value===c.code?'rgba(124,111,247,.1)':'transparent',transition:'all .15s'}}
                 onClick={()=>{onChange(c.code);setOpen(false);}}>
-                <img src={flagUrl(c.code)} alt={c.code} style={{width:20,height:15,objectFit:'cover',borderRadius:2}}/>
+                <img src={flagUrl(c.code,'w40')} alt={c.code} style={{width:24,height:18,objectFit:'cover',borderRadius:2}}/>
                 <span style={{fontSize:9,color:'var(--t3)',textAlign:'center',lineHeight:1.2}}>{c.name}</span>
               </div>
             ))}
@@ -798,14 +830,13 @@ function parseVer(raw) {
 
 const PANEL_VERSION_FALLBACK = 'v1.6.0'; // fallback if API unavailable
 
-function VersionBlock({ nodes }) {
+function VersionBlock({ nodes, panelVersion }) {
   const [versions, setVersions] = useState({});
   const [updating, setUpdating] = useState({});
   const [checking, setChecking] = useState(false);
   const [open, setOpen] = useState(false);
   const [latestRelease, setLatestRelease] = useState(null);
   const [checkingRelease, setCheckingRelease] = useState(false);
-  const [panelVersion, setPanelVersion] = useState(null); // loaded from /api/version
 
   const checkVersions = useCallback(async () => {
     if(!nodes.length) return;
@@ -833,13 +864,6 @@ function VersionBlock({ nodes }) {
 
   useEffect(() => { if(nodes.length) checkVersions(); }, [nodes.length]);
   useEffect(() => { if(open && !latestRelease) checkLatestRelease(); }, [open]);
-
-  // Load panel version from backend
-  useEffect(() => {
-    api('GET', '/api/version')
-      .then(r => setPanelVersion(r.version ? (r.version.startsWith('v') ? r.version : `v${r.version}`) : PANEL_VERSION_FALLBACK))
-      .catch(() => setPanelVersion(PANEL_VERSION_FALLBACK));
-  }, []);
 
   const updateNode = async (node) => {
     setUpdating(u => ({...u, [node.id]: true}));
@@ -995,22 +1019,24 @@ function VersionBlock({ nodes }) {
 }
 
 /* ── Dashboard ──────────────────────────────────────────── */
-function Dashboard({ nodes, onSelectNode }) {
+function Dashboard({ nodes, onSelectNode, onManageNode }) {
   const [status, setStatus] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [ref, setRef] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async (silent=false) => {
-    if(silent) setRef(true); else setLoading(true);
+    if(silent) setRefreshing(true); else setLoading(true);
     try { const s = await api('GET','/api/status'); setStatus(s); }
-    catch {} finally { setLoading(false); setRef(false); }
+    catch {} finally { setLoading(false); setRefreshing(false); }
   }, []);
 
-  useEffect(() => { load(); const t = setInterval(()=>load(true),15000); return ()=>clearInterval(t); }, []);
+  useEffect(() => { load(); const t = setInterval(()=>load(true), 15000); return ()=>clearInterval(t); }, []);
 
-  const totalUsers = useMemo(() => nodes.reduce((a,n)=>a+(n._userCount||0),0), [nodes]);
-  const online = useMemo(() => status.filter(s=>s.online).length, [status]);
-  const containers = useMemo(() => status.reduce((a,s)=>a+(s.containers||0),0), [status]);
+  const totalUsers    = useMemo(() => nodes.reduce((a,n)=>a+(n._userCount||0),0), [nodes]);
+  const onlineNodes   = useMemo(() => status.filter(s=>s.online).length, [status]);
+  const activeProxies = useMemo(() => status.reduce((a,s)=>a+(s.containers||0),0), [status]);
+  const stoppedProxies = totalUsers - activeProxies;
+  const totalOnline   = useMemo(() => status.reduce((a,s)=>a+(s.online_users||0),0), [status]);
 
   return (
     <div className="pg">
@@ -1020,108 +1046,174 @@ function Dashboard({ nodes, onSelectNode }) {
           <div className="page-desc">MTG Proxy AdminPanel</div>
         </div>
         <div className="topbar-right">
-          {ref && <span className="refreshing"><span className="spin"/> обновление</span>}
+          {refreshing && <span className="refreshing"><span className="spin"/></span>}
           <button className="btn btn-ghost btn-sm" onClick={()=>load()}><I.RefreshCw/> Обновить</button>
         </div>
       </div>
 
-      <div className="stats-row">
-        <div className="stat-card">
-          <div className="stat-top"><div className="stat-icon vi"><I.Network/></div></div>
-          <div className="stat-val vi">{nodes.length}</div>
-          <div className="stat-lbl">Нод всего / онлайн <span style={{color:'var(--gr)'}}>{online}</span></div>
+      {/* 2 summary cards */}
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16,marginBottom:24}}>
+        <div className="card" style={{padding:'20px 24px'}}>
+          <div style={{fontSize:12,fontWeight:600,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'1px',marginBottom:10}}>Ноды</div>
+          <div style={{fontSize:42,fontWeight:800,letterSpacing:'-1.5px',color:'var(--t1)',lineHeight:1,marginBottom:14}}>{nodes.length}</div>
+          <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+            <StatPill count={onlineNodes} label="онлайн" color="34,197,94" dot="dot-live"/>
+            {nodes.length - onlineNodes > 0 && <StatPill count={nodes.length-onlineNodes} label="офлайн" color="251,113,133" dot=""/>}
+          </div>
         </div>
-        <div className="stat-card">
-          <div className="stat-top"><div className="stat-icon cy"><I.Users/></div></div>
-          <div className="stat-val cy">{totalUsers}</div>
-          <div className="stat-lbl">Клиентов всего</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-top"><div className="stat-icon gr"><I.Activity/></div></div>
-          <div className="stat-val gr">{containers}</div>
-          <div className="stat-lbl">Активных прокси</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-top"><div className="stat-icon am"><I.Wifi/></div></div>
-          <div className="stat-val am">{online}/{nodes.length}</div>
-          <div className="stat-lbl">Нод доступно</div>
+        <div className="card" style={{padding:'20px 24px'}}>
+          <div style={{fontSize:12,fontWeight:600,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'1px',marginBottom:10}}>Клиенты</div>
+          <div style={{fontSize:42,fontWeight:800,letterSpacing:'-1.5px',color:'var(--t1)',lineHeight:1,marginBottom:14}}>{totalUsers}</div>
+          <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+            <StatPill count={activeProxies} label="активных" color="34,197,94" dot="dot-live"/>
+            {totalOnline > 0 && <StatPill count={totalOnline} label="онлайн" color="56,189,248" dot="dot-live"/>}
+            {stoppedProxies > 0 && <StatPill count={stoppedProxies} label="остановлен" color="251,113,133" dot=""/>}
+          </div>
         </div>
       </div>
 
+      {/* Node cards */}
       <div className="sec-lbl">Ноды</div>
-      {loading ? <div className="loading-center"><span className="spin"/> Загружаю...</div> : (
-        <div className="grid-2">
-          {nodes.map(node => {
-            const s = status.find(x=>x.id===node.id)||{};
-            return (
-              <div className="node-card" key={node.id} onClick={()=>onSelectNode(node)} style={{cursor:'pointer'}}>
-                <div className="node-head">
-                  <div style={{display:'flex',alignItems:'center',gap:12}}>
-                    <div className="node-icon"><I.Server/></div>
-                    <div className="node-info">
-                      <div className="node-name" style={{display:'flex',alignItems:'center',gap:8}}>
-                        {node.name}
-                        {node.flag && <img src={flagUrl(node.flag)} alt={node.flag} style={{width:20,height:15,objectFit:'cover',borderRadius:2,opacity:.9}}/>}
+      {loading
+        ? <div className="loading-center"><span className="spin"/> Загружаю...</div>
+        : (
+          <div className="grid-2">
+            {nodes.map(node => {
+              const s = status.find(x=>x.id===node.id)||{};
+              const total   = node._userCount||0;
+              const active  = s.containers||0;
+              const stopped = total - active;
+
+              return (
+                <div className="card" key={node.id}
+                  style={{padding:0,overflow:'hidden',cursor:'pointer',transition:'border-color .15s'}}
+                  onClick={()=>onSelectNode(node)}>
+
+                  {/* Header row */}
+                  <div style={{padding:'18px 20px 14px',borderBottom:'1px solid var(--b1)',display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:12}}>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:5}}>
+                        {node.flag && <img src={flagUrl(node.flag,'w80')} alt={node.flag} style={{width:32,height:24,objectFit:'cover',borderRadius:3,boxShadow:'0 1px 4px rgba(0,0,0,.3)',flexShrink:0}}/>}
+                        <span style={{fontSize:18,fontWeight:700,letterSpacing:'-0.3px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                          {node.name}
+                        </span>
                       </div>
-                      <div className="node-host">{node.host}</div>
+                      <div style={{fontSize:12,color:'var(--t3)',fontFamily:'var(--mono)'}}>{node.host}</div>
                     </div>
-                  </div>
-                  <span className={`badge ${s.online?'badge-green':'badge-red'}`}>
-                    <span className={`dot ${s.online?'dot-live':''}`}/>
-                    {s.online?'online':'offline'}
-                  </span>
-                </div>
-                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginTop:14}}>
-                  <div style={{display:'flex',gap:8}}>
-                    <span className="badge badge-purple" title="Всего клиентов">
-                      <I.Users style={{width:10,height:10}}/> {node._userCount||0}
+                    <span className={`badge ${s.online?'badge-green':'badge-red'}`} style={{flexShrink:0}}>
+                      <span className={`dot ${s.online?'dot-live':''}`}/>{s.online?'онлайн':'офлайн'}
                     </span>
-                    {s.containers > 0 && (
-                      <span className="badge badge-green" title="Активных прокси">{s.containers} active</span>
-                    )}
                   </div>
-                  <button className="btn btn-primary btn-sm" onClick={e=>{e.stopPropagation();onSelectNode(node);}}>
-                    Клиенты →
-                  </button>
+
+                  {/* stat pills */}
+                  <div style={{padding:'12px 20px',display:'flex',gap:8,flexWrap:'wrap',borderBottom:'1px solid var(--b1)'}}>
+                    <StatPill count={total}   label="всего"      color="124,111,247" dot={null}/>
+                    <StatPill count={active}  label="активных"   color="34,197,94"  dot="dot-live"/>
+                    {s.online_users > 0 && <StatPill count={s.online_users} label="онлайн" color="56,189,248" dot="dot-live"/>}
+                    {stopped > 0 && <StatPill count={stopped} label="остановлен" color="251,113,133" dot=""/>}
+                  </div>
+
+                  {/* Actions */}
+                  <div style={{padding:'12px 20px',display:'flex',gap:8}}>
+                    <button className="btn btn-primary btn-sm" style={{flex:1,justifyContent:'center'}}
+                      onClick={e=>{e.stopPropagation(); onManageNode(node);}}>
+                      <I.Users/> Клиенты
+                    </button>
+                    <button className="btn btn-secondary btn-sm" style={{flex:1,justifyContent:'center'}}
+                      onClick={e=>{e.stopPropagation(); onSelectNode(node);}}>
+                      <I.Server/> Нода
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+            {!nodes.length && (
+              <div style={{gridColumn:'1/-1'}}>
+                <div className="empty"><div className="empty-icon"><I.Server/></div>
+                  <div className="empty-title">Нет нод</div><div className="empty-desc">Добавь первую ноду</div>
                 </div>
               </div>
-            );
-          })}
-          {!nodes.length && <div style={{gridColumn:'1/-1'}}><div className="empty"><div className="empty-icon"><I.Server/></div><div className="empty-title">Нет нод</div><div className="empty-desc">Добавь первую ноду</div></div></div>}
-        </div>
-      )}
+            )}
+          </div>
+        )
+      }
     </div>
   );
 }
 
 /* ── Node Modal ─────────────────────────────────────────── */
 function NodeModal({ node, onClose, onSave }) {
-  const [f, setF] = useState(node||{name:'',host:'',ssh_user:'root',ssh_port:22,base_dir:'/opt/mtg/users',start_port:4433,ssh_password:'',ssh_key:'',flag:null});
+  const [f, setF] = useState(node || {
+    name:'', host:'', ssh_user:'root', ssh_port:22,
+    base_dir:'/opt/mtg/users', start_port:4433,
+    ssh_password:'', ssh_key:'', flag:null, agent_port:8081
+  });
   const [loading, setLoading] = useState(false);
-  const [auth, setAuth] = useState(node?.ssh_key?'key':'password');
+  const [auth, setAuth] = useState(node?.ssh_key ? 'key' : 'password');
+  const [agentChecking, setAgentChecking] = useState(false);
+  const [agentStatus, setAgentStatus] = useState(null); // null | true | false
+  const [showInstall, setShowInstall] = useState(false);
   const set = (k,v) => setF(x=>({...x,[k]:v}));
 
   const submit = async () => {
     if(!f.name||!f.host){toast('Заполни обязательные поля','error');return;}
     setLoading(true);
     try {
-      if(node) { await api('PUT',`/api/nodes/${node.id}`,f); toast('Нода обновлена','success'); }
-      else { await api('POST','/api/nodes',f); toast('Нода добавлена','success'); }
+      const payload = {...f, ssh_password: auth==='password' ? f.ssh_password : null, ssh_key: auth==='key' ? f.ssh_key : null };
+      if(node) { await api('PUT',`/api/nodes/${node.id}`,payload); toast('Нода обновлена','success'); }
+      else { await api('POST','/api/nodes',payload); toast('Нода добавлена','success'); }
       onSave();
     } catch(e){toast(e.message,'error');}
     finally{setLoading(false);}
   };
 
+  const [agentUpdating, setAgentUpdating] = useState(false);
+
+  const checkAgent = async () => {
+    if(!node?.id) return;
+    setAgentChecking(true);
+    try {
+      const r = await api('GET', `/api/nodes/${node.id}/check-agent`);
+      setAgentStatus(r.available);
+      toast(r.available ? 'Агент доступен ✓' : 'Агент недоступен', r.available ? 'success' : 'error');
+    } catch { setAgentStatus(false); }
+    finally { setAgentChecking(false); }
+  };
+
+  const updateAgent = async () => {
+    if(!node?.id) return;
+    setAgentUpdating(true);
+    toast('Обновление агента...', 'info');
+    try {
+      const r = await api('POST', `/api/nodes/${node.id}/update-agent`);
+      if(r.ok) toast('Агент обновлён ✓', 'success');
+      else toast('Ошибка обновления: ' + (r.error || r.output), 'error');
+      setAgentStatus(null);
+    } catch(e) { toast('Ошибка: ' + e.message, 'error'); }
+    finally { setAgentUpdating(false); }
+  };
+
+  const installCmd = `mkdir -p /opt/mtg-agent && cd /opt/mtg-agent && curl -fsSL https://raw.githubusercontent.com/MaksimTMB/mtg-adminpanel/dev/mtg-agent/install-agent.sh | bash`;
+
   return (
     <div className="overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
-      <div className="modal">
+      <div className="modal" style={{maxWidth:520}}>
         <div className="modal-head">
           <div className="modal-title">{node?<><I.Edit/> Редактировать ноду</>:<><I.Plus/> Добавить ноду</>}</div>
           <button className="modal-close" onClick={onClose}><I.X/></button>
         </div>
         <div className="modal-body">
-          <div className="form-group"><label className="form-label">Название *</label><input className="form-input" placeholder="Helsinki #1" value={f.name} onChange={e=>set('name',e.target.value)} autoFocus/></div>
-          <div className="form-group"><label className="form-label">Host / IP *</label><input className="form-input" placeholder="hel.maks68.com" value={f.host} onChange={e=>set('host',e.target.value)}/></div>
+          {/* Basic */}
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+            <div className="form-group" style={{gridColumn:'1/-1'}}>
+              <label className="form-label">Название *</label>
+              <input className="form-input" placeholder="Helsinki" value={f.name} onChange={e=>set('name',e.target.value)} autoFocus/>
+            </div>
+            <div className="form-group" style={{gridColumn:'1/-1'}}>
+              <label className="form-label">Host / IP *</label>
+              <input className="form-input" placeholder="hel.maks68.com" value={f.host} onChange={e=>set('host',e.target.value)}/>
+            </div>
+          </div>
           <div className="form-group">
             <label className="form-label">Флаг страны</label>
             <FlagPicker value={f.flag} onChange={v=>set('flag',v)}/>
@@ -1129,8 +1221,6 @@ function NodeModal({ node, onClose, onSave }) {
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
             <div className="form-group"><label className="form-label">SSH User</label><input className="form-input" placeholder="root" value={f.ssh_user} onChange={e=>set('ssh_user',e.target.value)}/></div>
             <div className="form-group"><label className="form-label">SSH Port</label><input className="form-input" type="number" placeholder="22" value={f.ssh_port} onChange={e=>set('ssh_port',parseInt(e.target.value))}/></div>
-          </div>
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
             <div className="form-group"><label className="form-label">Base Dir</label><input className="form-input" placeholder="/opt/mtg/users" value={f.base_dir} onChange={e=>set('base_dir',e.target.value)}/></div>
             <div className="form-group"><label className="form-label">Start Port</label><input className="form-input" type="number" placeholder="4433" value={f.start_port} onChange={e=>set('start_port',parseInt(e.target.value))}/></div>
           </div>
@@ -1145,6 +1235,49 @@ function NodeModal({ node, onClose, onSave }) {
             ? <div className="form-group"><label className="form-label">Пароль</label><input className="form-input" type="password" placeholder="••••••••" value={f.ssh_password||''} onChange={e=>set('ssh_password',e.target.value)}/></div>
             : <div className="form-group"><label className="form-label">Приватный ключ</label><textarea className="form-input" rows={4} placeholder="-----BEGIN OPENSSH PRIVATE KEY-----" value={f.ssh_key||''} onChange={e=>set('ssh_key',e.target.value)} style={{fontFamily:'var(--mono)',fontSize:11,resize:'vertical'}}/></div>
           }
+
+          {/* Agent section */}
+          <div style={{borderTop:'1px solid var(--b1)',paddingTop:16,marginTop:4}}>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
+              <div style={{fontSize:13,fontWeight:600,display:'flex',alignItems:'center',gap:8}}>
+                <I.Activity/> MTG Agent
+                {agentStatus===true && <span className="badge badge-green" style={{fontSize:10}}>доступен</span>}
+                {agentStatus===false && <span className="badge badge-red" style={{fontSize:10}}>недоступен</span>}
+                {node?.agent_port && agentStatus===null && <span className="badge badge-purple" style={{fontSize:10}}>порт {node.agent_port}</span>}
+              </div>
+              <div style={{display:'flex',gap:8}}>
+                {node && <button className="btn btn-ghost btn-sm" onClick={checkAgent} disabled={agentChecking}>
+                  {agentChecking?<><span className="spin spin-sm"/> проверка</>:<><I.Wifi/> Проверить</>}
+                </button>}
+                {node && <button className="btn btn-secondary btn-sm" onClick={updateAgent} disabled={agentUpdating}>
+                  {agentUpdating?<><span className="spin spin-sm"/> обновление...</>:<><I.RefreshCw/> Обновить</>}
+                </button>}
+                <button className="btn btn-ghost btn-sm" onClick={()=>setShowInstall(!showInstall)}>
+                  <I.Download/> Установить
+                </button>
+              </div>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Порт агента (оставь пустым если не установлен)</label>
+              <input className="form-input" type="number" placeholder="8081" value={f.agent_port||''}
+                onChange={e=>set('agent_port', e.target.value ? parseInt(e.target.value) : null)}/>
+            </div>
+            {showInstall && (
+              <div style={{background:'var(--bg3)',borderRadius:10,padding:14,border:'1px solid var(--b1)'}}>
+                <div style={{fontSize:12,color:'var(--t3)',marginBottom:8}}>Выполни на ноде {f.host}:</div>
+                <div style={{display:'flex',gap:8,alignItems:'flex-start'}}>
+                  <code style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--cy)',flex:1,wordBreak:'break-all',lineHeight:1.6,background:'var(--bg)',padding:'8px 10px',borderRadius:7,border:'1px solid var(--b1)'}}>
+                    {`mkdir -p /opt/mtg-agent && cd /opt/mtg-agent && curl -fsSL https://raw.githubusercontent.com/MaksimTMB/mtg-adminpanel/dev/mtg-agent/install-agent.sh | bash`}
+                  </code>
+                  <button className="btn btn-secondary btn-sm" style={{flexShrink:0}}
+                    onClick={()=>{copyText(`mkdir -p /opt/mtg-agent && cd /opt/mtg-agent && curl -fsSL https://raw.githubusercontent.com/MaksimTMB/mtg-adminpanel/dev/mtg-agent/install-agent.sh | bash`); toast('Скопировано','success');}}>
+                    <I.Copy/>
+                  </button>
+                </div>
+                <div style={{fontSize:11,color:'var(--t3)',marginTop:8}}>После установки порт агента: <strong>8081</strong></div>
+              </div>
+            )}
+          </div>
         </div>
         <div className="modal-foot">
           <button className="btn btn-ghost" onClick={onClose}>Отмена</button>
@@ -1158,60 +1291,26 @@ function NodeModal({ node, onClose, onSave }) {
 }
 
 /* ── Nodes Page ─────────────────────────────────────────── */
-function NodesPage({ nodes, onReload, onManage }) {
+/* ── Nodes List Page ─────────────────────────────────────── */
+function NodesPage({ nodes, onReload, onManage, onOpenNode }) {
   const [modal, setModal] = useState(false);
   const [edit, setEdit] = useState(null);
-  const [pings, setPings] = useState({});
-  const [showInfo, setShowInfo] = useState({});
+  const [status, setStatus] = useState([]);
 
-  // SSH check — measures connection establishment time, NOT network latency
-  const checkNode = useCallback(async (node) => {
-    setPings(p => ({...p, [node.id]: {...(p[node.id]||{}), checking: true}}));
-    try {
-      const r = await api('GET', `/api/nodes/${node.id}/check`);
-      setPings(p => ({...p, [node.id]: { online: r.online, checking: false }}));
-    } catch {
-      setPings(p => ({...p, [node.id]: { online: false, checking: false }}));
-    }
+  const loadStatus = useCallback(async () => {
+    try { const s = await api('GET','/api/status'); setStatus(s); } catch {}
   }, []);
 
-  // Auto-check on mount + every 20 seconds
   useEffect(() => {
-    nodes.forEach(n => checkNode(n));
-    const t = setInterval(() => nodes.forEach(n => checkNode(n)), 20000);
+    loadStatus();
+    const t = setInterval(loadStatus, 20000);
     return () => clearInterval(t);
-  }, [nodes.length]);
+  }, []);
 
   const del = async (node) => {
     if(!confirm(`Удалить ноду ${node.name}?`)) return;
     try { await api('DELETE',`/api/nodes/${node.id}`); toast('Нода удалена','success'); onReload(); }
     catch(e) { toast(e.message,'error'); }
-  };
-
-  const toggleInfo = (id) => setShowInfo(s => ({...s, [id]: !s[id]}));
-
-  const StatusBadge = ({ nodeId }) => {
-    const p = pings[nodeId];
-    if(!p) return (
-      <span className="badge" style={{background:'var(--b1)',color:'var(--t3)'}}>
-        <span className="spin spin-sm" style={{width:9,height:9}}/> проверка
-      </span>
-    );
-    if(p.checking && !p.online && p.online !== false) return (
-      <span className="badge" style={{background:'var(--b1)',color:'var(--t3)'}}>
-        <span className="spin spin-sm" style={{width:9,height:9}}/> проверка
-      </span>
-    );
-    if(!p.online) return (
-      <span className="badge badge-red"><span className="dot"/>offline</span>
-    );
-    return (
-      <span className="badge badge-green" title="SSH соединение установлено">
-        <span className={`dot ${p.checking?'':'dot-live'}`}/>
-        online
-        {p.checking && <span className="spin spin-sm" style={{width:9,height:9,marginLeft:4,borderTopColor:'var(--gr)'}}/>}
-      </span>
-    );
   };
 
   return (
@@ -1228,51 +1327,190 @@ function NodesPage({ nodes, onReload, onManage }) {
         </div>
       </div>
 
-      {!nodes.length ? (
-        <div className="card"><div className="empty"><div className="empty-icon"><I.Server/></div><div className="empty-title">Нет нод</div><div className="empty-desc">Добавь первую ноду для начала работы</div></div></div>
-      ) : (
-        <div className="grid-2">
-          {nodes.map(node => (
-            <div className="node-card" key={node.id}>
-              <div className="node-head">
-                <div style={{display:'flex',alignItems:'center',gap:12}}>
-                  <div className="node-icon"><I.Server/></div>
-                  <div className="node-info">
-                    <div className="node-name" style={{display:'flex',alignItems:'center',gap:8}}>
-                      {node.name}
-                      {node.flag && <img src={flagUrl(node.flag)} alt={node.flag} style={{width:20,height:15,objectFit:'cover',borderRadius:2,opacity:.9}}/>}
+      {!nodes.length
+        ? <div className="card"><div className="empty"><div className="empty-icon"><I.Server/></div><div className="empty-title">Нет нод</div><div className="empty-desc">Добавь первую ноду</div></div></div>
+        : (
+          <div className="grid-2">
+            {nodes.map(node => {
+              const s = status.find(x=>x.id===node.id)||{};
+              const total   = node._userCount||0;
+              const active  = s.containers||0;
+              const stopped = total - active;
+              return (
+                <div className="card" key={node.id} style={{padding:0,overflow:'hidden',cursor:'pointer'}}
+                  onClick={()=>onOpenNode(node)}>
+                  <div style={{padding:'18px 20px 14px',borderBottom:'1px solid var(--b1)',display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:12}}>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:5}}>
+                        {node.flag && <img src={flagUrl(node.flag,'w80')} alt={node.flag} style={{width:32,height:24,objectFit:'cover',borderRadius:3,boxShadow:'0 1px 4px rgba(0,0,0,.3)',flexShrink:0}}/>}
+                        <span style={{fontSize:17,fontWeight:700,letterSpacing:'-0.3px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{node.name}</span>
+                        {node.agent_port && <span className="badge badge-purple" style={{fontSize:10,padding:'2px 6px'}}>Agent</span>}
+                      </div>
+                      <div style={{fontSize:12,color:'var(--t3)',fontFamily:'var(--mono)'}}>{node.host}</div>
                     </div>
-                    <div className="node-host">{node.host}</div>
+                    <span className={`badge ${s.online?'badge-green':'badge-red'}`} style={{flexShrink:0}}>
+                      <span className={`dot ${s.online?'dot-live':''}`}/>{s.online?'онлайн':'офлайн'}
+                    </span>
+                  </div>
+                  <div style={{padding:'11px 20px',display:'flex',gap:8,flexWrap:'wrap',borderBottom:'1px solid var(--b1)'}}>
+                    <StatPill count={total}  label="всего"      color="124,111,247" dot={null}/>
+                    <StatPill count={active} label="активных"   color="34,197,94"  dot="dot-live"/>
+                    {s.online_users > 0 && <StatPill count={s.online_users} label="онлайн" color="56,189,248" dot="dot-live"/>}
+                    {stopped > 0 && <StatPill count={stopped} label="остановлен" color="251,113,133" dot=""/>}
+                  </div>
+                  <div style={{padding:'11px 20px',display:'flex',gap:8,alignItems:'center'}}>
+                    <button className="btn btn-primary btn-sm" style={{flex:1,justifyContent:'center'}}
+                      onClick={e=>{e.stopPropagation();onManage(node);}}>
+                      <I.Users/> Клиенты
+                    </button>
+                    <button className="btn btn-secondary btn-sm" onClick={e=>{e.stopPropagation();setEdit(node);setModal(true);}}>
+                      <I.Edit/>
+                    </button>
+                    <button className="btn btn-danger btn-sm" onClick={e=>{e.stopPropagation();del(node);}}>
+                      <I.Trash/>
+                    </button>
                   </div>
                 </div>
-                <StatusBadge nodeId={node.id}/>
-              </div>
+              );
+            })}
+          </div>
+        )
+      }
+      {modal && <NodeModal node={edit} onClose={()=>setModal(false)} onSave={()=>{setModal(false);onReload();}}/>}
+    </div>
+  );
+}
 
-              {showInfo[node.id] && (
-                <div className="node-info-row">
-                  <div>SSH: <span style={{color:'var(--t2)'}}>{node.ssh_user}@{node.host}:{node.ssh_port}</span></div>
-                  <div>Base dir: <span style={{color:'var(--t2)'}}>{node.base_dir}</span></div>
-                  <div>Start port: <span style={{color:'var(--t2)'}}>{node.start_port}</span></div>
-                </div>
-              )}
+/* ── Node Detail Page ────────────────────────────────────── */
+function NodePage({ node, onBack, onManage, onReload }) {
+  const [status, setStatus] = useState(null);
+  const [users, setUsers] = useState([]);
+  const [traffic, setTraffic] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [modalEdit, setModalEdit] = useState(false);
 
-              <div className="node-actions" style={{marginTop:14}}>
-                <button className="btn btn-primary btn-sm" onClick={()=>onManage(node)}>
-                  <I.Users/>
-                  Клиенты
-                  {node._userCount > 0 && <span style={{marginLeft:4,background:'rgba(255,255,255,0.18)',borderRadius:4,padding:'1px 6px',fontSize:11,fontWeight:600}}>{node._userCount}</span>}
-                </button>
-                <button className="btn btn-secondary btn-sm" onClick={()=>toggleInfo(node.id)}>
-                  <I.Info/> {showInfo[node.id]?'Скрыть':'Инфо'}
-                </button>
-                <button className="btn btn-secondary btn-sm" onClick={()=>{setEdit(node);setModal(true);}}><I.Edit/></button>
-                <button className="btn btn-danger btn-sm" onClick={()=>del(node)}><I.Trash/></button>
-              </div>
+  const loadData = useCallback(async () => {
+    try {
+      const [st, u, tr] = await Promise.allSettled([
+        api('GET', `/api/nodes/${node.id}/check`),
+        api('GET', `/api/nodes/${node.id}/users`),
+        api('GET', `/api/nodes/${node.id}/traffic`),
+      ]);
+      if(st.status==='fulfilled') setStatus(st.value);
+      if(u.status==='fulfilled')  setUsers(u.value||[]);
+      if(tr.status==='fulfilled') setTraffic(tr.value||{});
+    } catch {} finally { setLoading(false); }
+  }, [node.id]);
+
+  useEffect(() => {
+    loadData();
+    const t = setInterval(loadData, 20000);
+    return () => clearInterval(t);
+  }, [loadData]);
+
+  const isOnline = status ? status.online : null;
+  const active      = users.filter(u => u.running).length;
+  const stopped     = users.filter(u => !u.running).length;
+  const onlineUsers = users.filter(u => u.is_online).length;
+
+  return (
+    <div className="pg">
+      <div className="topbar">
+        <div className="topbar-left" style={{display:'flex',alignItems:'center',gap:14}}>
+          <button className="btn btn-ghost btn-sm" onClick={onBack}><I.ArrowLeft/> Назад</button>
+          <div style={{display:'flex',alignItems:'center',gap:10}}>
+            {node.flag && <img src={flagUrl(node.flag,'w80')} alt={node.flag} style={{width:32,height:24,objectFit:'cover',borderRadius:3,boxShadow:'0 1px 4px rgba(0,0,0,.3)'}}/>}
+            <div>
+              <div className="page-title" style={{marginBottom:0}}><em>{node.name}</em></div>
+              <div style={{fontSize:12,color:'var(--t3)',fontFamily:'var(--mono)'}}>{node.host}</div>
             </div>
-          ))}
+          </div>
+        </div>
+        <div className="topbar-right">
+          <button className="btn btn-ghost btn-sm" onClick={loadData}><I.RefreshCw/></button>
+          <button className="btn btn-secondary btn-sm" onClick={()=>setModalEdit(true)}><I.Edit/> Настройки</button>
+          <button className="btn btn-primary btn-sm" onClick={()=>onManage(node)}><I.Users/> Клиенты</button>
+        </div>
+      </div>
+
+      {/* Status + SSH info */}
+      <div className="card" style={{marginBottom:16,padding:'18px 20px'}}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:14}}>
+          <div style={{display:'flex',gap:16,flexWrap:'wrap'}}>
+            <div>
+              <div style={{fontSize:11,color:'var(--t3)',marginBottom:4}}>SSH</div>
+              <div style={{fontFamily:'var(--mono)',fontSize:12,color:'var(--t2)'}}>{node.ssh_user}@{node.host}:{node.ssh_port}</div>
+            </div>
+            <div>
+              <div style={{fontSize:11,color:'var(--t3)',marginBottom:4}}>Базовая директория</div>
+              <div style={{fontFamily:'var(--mono)',fontSize:12,color:'var(--t2)'}}>{node.base_dir}</div>
+            </div>
+            <div>
+              <div style={{fontSize:11,color:'var(--t3)',marginBottom:4}}>Начальный порт</div>
+              <div style={{fontFamily:'var(--mono)',fontSize:12,color:'var(--t2)'}}>{node.start_port}</div>
+            </div>
+            {node.agent_port && (
+              <div>
+                <div style={{fontSize:11,color:'var(--t3)',marginBottom:4}}>Агент</div>
+                <div style={{fontFamily:'var(--mono)',fontSize:12,color:'var(--vi)'}}>:{node.agent_port}</div>
+              </div>
+            )}
+          </div>
+          <span className={`badge ${isOnline===null?'':isOnline?'badge-green':'badge-red'}`} style={{fontSize:13,padding:'8px 14px'}}>
+            <span className={`dot ${isOnline?'dot-live':''}`}/>
+            {isOnline===null ? 'проверка...' : isOnline ? 'онлайн' : 'офлайн'}
+          </span>
+        </div>
+      </div>
+
+      {/* 4 stat pills */}
+      {!loading && (
+        <div style={{display:'flex',gap:12,marginBottom:16,flexWrap:'wrap'}}>
+          <StatPill count={users.length} label="Всего"       color="124,111,247" dot={null}   large/>
+          <StatPill count={active}       label="Активных"    color="34,197,94"  dot="dot-live" large/>
+          <StatPill count={onlineUsers}  label="Онлайн"      color="56,189,248" dot="dot-live" large/>
+          {stopped > 0 && <StatPill count={stopped} label="Остановлен" color="251,113,133" dot="" large/>}
         </div>
       )}
-      {modal && <NodeModal node={edit} onClose={()=>setModal(false)} onSave={()=>{setModal(false);onReload();}}/>}
+
+      {/* Clients table */}
+      <div className="card">
+        {loading ? <div className="loading-center"><span className="spin"/> Загружаю...</div> : (
+          <div className="table-wrap">
+            <table>
+              <thead><tr>
+                <th>Клиент</th><th>Порт</th><th>Онлайн</th><th>Устройств</th>
+                <th>Трафик</th><th>Статус</th><th>Срок</th><th>Действия</th>
+              </tr></thead>
+              <tbody>
+                {users.map(u => {
+                  const traf = u.running ? traffic[u.name] : (u.traffic_rx_snap ? {rx:u.traffic_rx_snap, tx:u.traffic_tx_snap} : traffic[u.name]);
+                  return (
+                    <tr key={u.id} style={{opacity:u.expired?0.5:1}}>
+                      <td><span style={{fontFamily:'var(--mono)',fontWeight:600,fontSize:14}}>{u.name}</span></td>
+                      <td><span className="badge badge-purple">{u.port}</span></td>
+                      <td>{u.is_online ? <span className="badge badge-green"><span className="dot dot-live"/>онлайн</span> : <span style={{color:'var(--t3)',fontSize:12}}>—</span>}</td>
+                      <td><span style={{fontFamily:'var(--mono)',fontWeight:500,fontSize:14,color:u.connections>0?'var(--vi)':'var(--t3)'}}>{u.connections}{u.max_devices?`/${u.max_devices}`:''}</span></td>
+                      <td>{traf ? <span className="traf"><span className="rx">↓{traf.rx}</span><span className="tx"> ↑{traf.tx}</span></span> : <span style={{color:'var(--t3)',fontSize:12}}>—</span>}</td>
+                      <td><span className={`badge ${u.running?'badge-green':'badge-red'}`}><span className={`dot ${u.running?'dot-live':''}`}/>{u.running?'активен':'остановлен'}</span></td>
+                      <td>{expiryBadge(u.expires_at)}</td>
+                      <td>
+                        <div className="acts">
+                          <button className="btn btn-icon btn-secondary btn-sm" onClick={()=>copyText(u.link)} title="Копировать ссылку"><I.Copy/></button>
+                          <button className="btn btn-icon btn-secondary btn-sm" onClick={()=>onManage(node)} title="Управление клиентом"><I.Edit/></button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+                {!users.length && <tr><td colSpan={8}><div className="empty"><div className="empty-icon"><I.Users/></div><div className="empty-title">Нет клиентов</div></div></td></tr>}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {modalEdit && <NodeModal node={node} onClose={()=>setModalEdit(false)} onSave={()=>{setModalEdit(false);onReload();}}/>}
     </div>
   );
 }
@@ -1364,9 +1602,11 @@ function AddUserModal({ nodeId, onClose, onSave }) {
 /* ── Edit User Modal ────────────────────────────────────── */
 function EditModal({ user, nodeId, onClose, onSave }) {
   const [f, setF] = useState({
-    note:user.note||'',
-    expires_at:user.expires_at?user.expires_at.replace(' ','T').slice(0,16):'',
-    traffic_limit_gb:user.traffic_limit_gb||''
+    note: user.note||'',
+    expires_at: user.expires_at ? user.expires_at.replace(' ','T').slice(0,16) : '',
+    traffic_limit_gb: user.traffic_limit_gb||'',
+    max_devices: user.max_devices||'',
+    traffic_reset_interval: user.traffic_reset_interval||'never',
   });
   const [loading, setLoading] = useState(false);
   const set = (k,v) => setF(x=>({...x,[k]:v}));
@@ -1374,34 +1614,121 @@ function EditModal({ user, nodeId, onClose, onSave }) {
   const submit = async () => {
     setLoading(true);
     try {
-      await api('PUT',`/api/nodes/${nodeId}/users/${user.name}`,{
-        note:f.note, expires_at:f.expires_at||null,
-        traffic_limit_gb:f.traffic_limit_gb?parseFloat(f.traffic_limit_gb):null
+      await api('PUT', `/api/nodes/${nodeId}/users/${user.name}`, {
+        note: f.note,
+        expires_at: f.expires_at||null,
+        traffic_limit_gb: f.traffic_limit_gb ? parseFloat(f.traffic_limit_gb) : null,
+        max_devices: f.max_devices ? parseInt(f.max_devices) : null,
+        traffic_reset_interval: f.traffic_reset_interval !== 'never' ? f.traffic_reset_interval : null,
       });
       toast('Сохранено','success'); onSave();
     } catch(e){toast(e.message,'error');}
     finally{setLoading(false);}
   };
 
+  const fmtBytes = (b) => {
+    if(!b) return '0';
+    if(b >= 1073741824) return (b/1073741824).toFixed(2)+'GB';
+    if(b >= 1048576) return (b/1048576).toFixed(2)+'MB';
+    if(b >= 1024) return (b/1024).toFixed(2)+'KB';
+    return b+'B';
+  };
+  const totalRx = fmtBytes(user.total_traffic_rx_bytes);
+  const totalTx = fmtBytes(user.total_traffic_tx_bytes);
+
+  const INTERVALS = [
+    {v:'never', label:'Не сбрасывать'},
+    {v:'daily',   label:'Каждый день'},
+    {v:'monthly', label:'Каждый месяц'},
+    {v:'yearly',  label:'Каждый год'},
+  ];
+
   return (
     <div className="overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
-      <div className="modal" style={{maxWidth:420}}>
+      <div className="modal" style={{maxWidth:460}}>
         <div className="modal-head">
-          <div className="modal-title"><I.Edit/> {user.name}</div>
+          <div className="modal-title"><I.Edit/> Настройки — {user.name}</div>
           <button className="modal-close" onClick={onClose}><I.X/></button>
         </div>
         <div className="modal-body">
-          <div className="form-group"><label className="form-label">Заметка</label>
+
+          {/* Basic */}
+          <div className="form-group">
+            <label className="form-label">Заметка</label>
             <input className="form-input" placeholder="Иван, оплатил до 01.04" value={f.note} onChange={e=>set('note',e.target.value)} autoFocus/>
           </div>
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
-            <div className="form-group"><label className="form-label">Истекает</label>
+            <div className="form-group">
+              <label className="form-label">Истекает</label>
               <input className="form-input" type="datetime-local" value={f.expires_at} onChange={e=>set('expires_at',e.target.value)}/>
             </div>
-            <div className="form-group"><label className="form-label">Лимит (ГБ)</label>
+            <div className="form-group">
+              <label className="form-label">Лимит трафика (ГБ)</label>
               <input className="form-input" type="number" placeholder="∞" min="0" step="0.1" value={f.traffic_limit_gb} onChange={e=>set('traffic_limit_gb',e.target.value)}/>
             </div>
           </div>
+
+          {/* Device limit */}
+          <div style={{borderTop:'1px solid var(--b1)',paddingTop:14,marginTop:4}}>
+            <div style={{fontSize:13,fontWeight:600,marginBottom:10,display:'flex',alignItems:'center',gap:8}}>
+              <span style={{width:16,height:16,display:'inline-flex',flexShrink:0}}><I.Wifi/></span>
+              Ограничения устройств
+            </div>
+            <div className="form-group">
+              <label className="form-label">Макс. одновременных устройств</label>
+              <input className="form-input" type="number" placeholder="∞ (без ограничений)"
+                min="1" step="1" value={f.max_devices}
+                onChange={e=>set('max_devices',e.target.value)}/>
+              <div style={{fontSize:11,color:'var(--t3)',marginTop:5}}>
+                При превышении прокси автоматически остановится
+              </div>
+            </div>
+          </div>
+
+          {/* Auto traffic reset */}
+          <div style={{borderTop:'1px solid var(--b1)',paddingTop:14,marginTop:4}}>
+            <div style={{fontSize:13,fontWeight:600,marginBottom:10,display:'flex',alignItems:'center',gap:8}}>
+              <span style={{width:16,height:16,display:'inline-flex',flexShrink:0}}><I.RefreshCw/></span>
+              Автосброс трафика
+            </div>
+            <div className="form-group">
+              <label className="form-label">Интервал сброса</label>
+              <div className="radio-group" style={{flexWrap:'wrap'}}>
+                {INTERVALS.map(i => (
+                  <div key={i.v} className={`radio-btn ${f.traffic_reset_interval===i.v?'on':''}`}
+                    onClick={()=>set('traffic_reset_interval',i.v)}>
+                    {i.label}
+                  </div>
+                ))}
+              </div>
+            </div>
+            {user.next_reset_at && (
+              <div style={{fontSize:11,color:'var(--t3)',marginTop:4}}>
+                Следующий сброс: <span style={{color:'var(--t2)'}}>{new Date(user.next_reset_at).toLocaleString('ru-RU')}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Total traffic stats */}
+          {(user.total_traffic_rx_bytes > 0 || user.total_traffic_tx_bytes > 0) && (
+            <div style={{borderTop:'1px solid var(--b1)',paddingTop:14,marginTop:4}}>
+              <div style={{fontSize:13,fontWeight:600,marginBottom:8,display:'flex',alignItems:'center',gap:8}}>
+                <span style={{width:16,height:16,display:'inline-flex',flexShrink:0}}><I.Activity/></span>
+                Накопленный трафик
+              </div>
+              <div style={{display:'flex',gap:16}}>
+                <div style={{background:'var(--bg3)',borderRadius:8,padding:'8px 14px',flex:1,textAlign:'center'}}>
+                  <div style={{fontSize:11,color:'var(--t3)',marginBottom:3}}>Получено</div>
+                  <div style={{fontFamily:'var(--mono)',fontSize:13,color:'var(--cy)'}}>{totalRx}</div>
+                </div>
+                <div style={{background:'var(--bg3)',borderRadius:8,padding:'8px 14px',flex:1,textAlign:'center'}}>
+                  <div style={{fontSize:11,color:'var(--t3)',marginBottom:3}}>Отправлено</div>
+                  <div style={{fontFamily:'var(--mono)',fontSize:13,color:'var(--gr)'}}>{totalTx}</div>
+                </div>
+              </div>
+            </div>
+          )}
+
         </div>
         <div className="modal-foot">
           <button className="btn btn-ghost" onClick={onClose}>Отмена</button>
@@ -1415,41 +1742,6 @@ function EditModal({ user, nodeId, onClose, onSave }) {
 }
 
 /* ── Chart ──────────────────────────────────────────────── */
-function Chart({ nodeId, userName }) {
-  const ref = useRef(null);
-  const inst = useRef(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    api('GET',`/api/nodes/${nodeId}/users/${userName}/history`).then(data => {
-      setLoading(false);
-      if(!ref.current) return;
-      if(inst.current) inst.current.destroy();
-      const labels = data.map(d => { const t=new Date(d.recorded_at); return `${t.getHours().toString().padStart(2,'0')}:${t.getMinutes().toString().padStart(2,'0')}`; });
-      inst.current = new window.Chart(ref.current, {
-        type:'line',
-        data:{ labels, datasets:[{ label:'Подключений', data:data.map(d=>d.connections),
-          borderColor:'#7c6ff7', backgroundColor:'rgba(124,111,247,0.08)',
-          tension:0.45, fill:true, pointRadius:3, pointBackgroundColor:'#38bdf8', borderWidth:2 }] },
-        options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
-          scales:{
-            x:{ticks:{color:'#373d5a',maxTicksLimit:8,font:{size:10,family:'Geist Mono,monospace'}},grid:{color:'rgba(255,255,255,0.03)'}},
-            y:{ticks:{color:'#373d5a',font:{size:10,family:'Geist Mono,monospace'}},grid:{color:'rgba(255,255,255,0.03)'},beginAtZero:true,precision:0}
-          }
-        }
-      });
-    }).catch(()=>setLoading(false));
-    return () => { if(inst.current) inst.current.destroy(); };
-  }, [nodeId, userName]);
-
-  return (
-    <div style={{height:160,position:'relative'}}>
-      {loading && <div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--t3)',gap:8,fontSize:12}}><span className="spin"/>Загружаю график...</div>}
-      <canvas ref={ref} style={{display:loading?'none':'block'}}/>
-    </div>
-  );
-}
-
 /* ── Users Page ─────────────────────────────────────────── */
 function UsersPage({ node, onBack }) {
   const [users, setUsers] = useState([]);
@@ -1458,7 +1750,6 @@ function UsersPage({ node, onBack }) {
   const [modal, setModal] = useState(false);
   const [busy, setBusy] = useState({});
   const [editU, setEditU] = useState(null);
-  const [chartU, setChartU] = useState(null);
   const [qrU, setQrU] = useState(null);
   const [traffic, setTraffic] = useState({});
 
@@ -1514,23 +1805,17 @@ function UsersPage({ node, onBack }) {
     finally{setBusyFor(user.name+'_reset', false);}
   };
 
-  const expiry = (expires_at) => {
-    if(!expires_at) return null;
-    const diff = new Date(expires_at) - new Date();
-    if(diff<0) return <span className="badge badge-red">истёк</span>;
-    const d = Math.floor(diff/86400000);
-    if(d<1) return <span className="badge badge-amber">&lt;1д</span>;
-    return <span style={{fontSize:11,color:'var(--t2)',fontFamily:'var(--mono)'}}>{d}д</span>;
-  };
-
   return (
     <div className="pg">
       <div className="topbar">
         <div className="topbar-left" style={{display:'flex',alignItems:'center',gap:14}}>
           <button className="btn btn-ghost btn-sm" onClick={onBack}><I.ArrowLeft/> Назад</button>
-          <div>
-            <div className="page-title"><em>{node.name}</em></div>
-            <div className="page-desc">{node.host}</div>
+          <div style={{display:'flex',alignItems:'center',gap:10}}>
+            {node.flag && <img src={flagUrl(node.flag,'w80')} alt={node.flag} style={{width:30,height:22,objectFit:'cover',borderRadius:3,boxShadow:'0 1px 4px rgba(0,0,0,.3)',flexShrink:0}}/>}
+            <div>
+              <div className="page-title" style={{marginBottom:0}}><em>{node.name}</em></div>
+              <div className="page-desc" style={{marginTop:0}}>{node.host}</div>
+            </div>
           </div>
         </div>
         <div className="topbar-right">
@@ -1541,16 +1826,6 @@ function UsersPage({ node, onBack }) {
         </div>
       </div>
 
-      {chartU && (
-        <div className="card" style={{marginBottom:16}}>
-          <div className="card-header">
-            <div className="card-title"><I.TrendUp/> График подключений — {chartU}</div>
-            <button className="btn btn-ghost btn-sm btn-icon" onClick={()=>setChartU(null)}><I.X/></button>
-          </div>
-          <Chart nodeId={node.id} userName={chartU}/>
-        </div>
-      )}
-
       <div className="card">
         {loading ? <div className="loading-center"><span className="spin"/> Загружаю юзеров...</div> : (
           <div className="table-wrap">
@@ -1559,7 +1834,7 @@ function UsersPage({ node, onBack }) {
                 <th>Клиент</th>
                 <th>Порт</th>
                 <th>Онлайн</th>
-                <th>Подкл.</th>
+                <th>Устройств</th>
                 <th>Трафик</th>
                 <th>Статус</th>
                 <th>Срок / Лимит</th>
@@ -1571,6 +1846,8 @@ function UsersPage({ node, onBack }) {
                   const traf = u.running
                     ? traffic[u.name]
                     : (u.traffic_rx_snap ? {rx:u.traffic_rx_snap, tx:u.traffic_tx_snap} : traffic[u.name]);
+                  const devLimit = u.max_devices;
+                  const devOver = devLimit && u.connections > devLimit;
                   return (
                   <tr key={u.id} style={{opacity:u.expired ? 0.5 : 1}}>
                     <td><span style={{fontFamily:'var(--mono)',fontWeight:600,fontSize:14}}>{u.name}</span></td>
@@ -1581,9 +1858,10 @@ function UsersPage({ node, onBack }) {
                         : <span style={{color:'var(--t3)',fontSize:12}}>—</span>}
                     </td>
                     <td>
-                      <span style={{fontFamily:'var(--mono)',color:'var(--vi)',cursor:'pointer',fontWeight:500,fontSize:14}}
-                        onClick={()=>setChartU(chartU===u.name?null:u.name)} title="Показать график">
-                        {u.connections}
+                      <span style={{fontFamily:'var(--mono)',fontWeight:500,fontSize:14,
+                        color: devOver ? 'var(--re)' : u.connections > 0 ? 'var(--vi)' : 'var(--t3)'}}
+                        title={devLimit ? `Лимит: ${devLimit} устройств` : 'Без ограничений'}>
+                        {u.connections}{devLimit ? `/${devLimit}` : ''}
                       </span>
                     </td>
                     <td>
@@ -1603,10 +1881,14 @@ function UsersPage({ node, onBack }) {
                     </td>
                     <td>
                       <div style={{display:'flex',flexDirection:'column',gap:3}}>
-                        {u.expires_at && <div>{expiry(u.expires_at)}</div>}
+                        {u.expires_at && <div>{expiryBadge(u.expires_at)}</div>}
                         {u.traffic_limit_gb && <span style={{fontSize:11,color:'var(--t3)',fontFamily:'var(--mono)'}}>{u.traffic_limit_gb}GB</span>}
                         {!u.expires_at && !u.traffic_limit_gb && <span style={{color:'var(--t3)',fontSize:12}}>∞</span>}
-                        {u.traffic_reset_at && <span style={{fontSize:10,color:'var(--t3)'}} title={`Сброс: ${new Date(u.traffic_reset_at).toLocaleString('ru-RU')}`}>↺ сброшен</span>}
+                        {u.traffic_reset_interval && u.traffic_reset_interval !== 'never' && (
+                          <span style={{fontSize:10,color:'var(--vi)'}} title={u.next_reset_at ? `Следующий: ${new Date(u.next_reset_at).toLocaleString('ru-RU')}` : ''}>
+                            ↺ {u.traffic_reset_interval === 'daily' ? 'день' : u.traffic_reset_interval === 'monthly' ? 'мес' : 'год'}
+                          </span>
+                        )}
                       </div>
                     </td>
                     <td style={{maxWidth:120,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',fontSize:13,color:'var(--t2)'}} title={u.note}>
@@ -1746,16 +2028,7 @@ function AllUsers({ nodes, onSelectNode }) {
                                 <span className={`dot ${u.running?'dot-live':''}`}/>{u.running?'active':'stopped'}
                               </span>
                             </td>
-                            <td>
-                              {u.expires_at
-                                ? (() => {
-                                    const diff = new Date(u.expires_at) - new Date();
-                                    if(diff < 0) return <span className="badge badge-red">истёк</span>;
-                                    const d = Math.floor(diff/86400000);
-                                    return <span style={{fontSize:11,color: d<3?'var(--am)':'var(--t2)',fontFamily:'var(--mono)'}}>{d}д</span>;
-                                  })()
-                                : <span style={{color:'var(--t3)',fontSize:11}}>∞</span>}
-                            </td>
+                            <td>{expiryBadge(u.expires_at, true)}</td>
                             <td style={{maxWidth:100,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',fontSize:12,color:'var(--t2)'}} title={u.note}>
                               {u.note || <span style={{color:'var(--t3)'}}>—</span>}
                             </td>
@@ -1895,7 +2168,9 @@ function App() {
   const [authed, setAuthed] = useState(!!getToken());
   const [page, setPage] = useState('dashboard');
   const [nodes, setNodes] = useState([]);
-  const [selNode, setSelNode] = useState(null);
+  const [selNode, setSelNode] = useState(null);      // for users page
+  const [selNodeView, setSelNodeView] = useState(null); // for node detail page
+  const [panelVersion, setPanelVersion] = useState(null);
   const toasts = useToast();
 
   const loadNodes = useCallback(async () => {
@@ -1912,11 +2187,18 @@ function App() {
     } catch {}
   }, []);
 
+  useEffect(() => {
+    api('GET', '/api/version')
+      .then(r => setPanelVersion(r.version ? (r.version.startsWith('v') ? r.version : `v${r.version}`) : null))
+      .catch(() => {});
+  }, []);
+
   useEffect(()=>{ if(authed) loadNodes(); },[authed]);
   useEffect(()=>{ if(nodes.length&&!nodes[0]._userCount) loadCounts(nodes); },[nodes]);
 
-  const nav = (p) => { setPage(p); if(p!=='users') setSelNode(null); };
+  const nav = (p) => { setPage(p); setSelNode(null); setSelNodeView(null); };
   const selectNode = (n) => { setSelNode(n); setPage('users'); };
+  const openNodeView = (n) => { setSelNodeView(n); setPage('node'); };
 
   const NAV = [
     { id:'dashboard', icon:<I.LayoutDash/>, label:'Дашборд' },
@@ -1934,20 +2216,20 @@ function App() {
           <div className="logo-icon"><I.Zap/></div>
           <div className="logo-texts">
             <div className="logo-name">MTG Panel</div>
-            <div className="logo-sub">adminpanel v1.5</div>
+            <div className="logo-sub">{panelVersion || 'adminpanel'}</div>
           </div>
         </div>
 
         <nav className="nav">
           <div className="nav-section">Навигация</div>
           {NAV.map(item => (
-            <div key={item.id} className={`nav-item ${page===item.id?'active':''}`} onClick={()=>nav(item.id)}>
+            <div key={item.id} className={`nav-item ${(page===item.id||(page==='node'&&item.id==='nodes'))?'active':''}`} onClick={()=>nav(item.id)}>
               {item.icon}{item.label}
             </div>
           ))}
         </nav>
 
-        <VersionBlock nodes={nodes}/>
+        <VersionBlock nodes={nodes} panelVersion={panelVersion}/>
 
         <div className="sidebar-footer">
           <button className="btn btn-ghost btn-sm" style={{width:'100%',justifyContent:'center',marginTop:8}}
@@ -1958,10 +2240,11 @@ function App() {
       </aside>
 
       <main className="main">
-        {page==='dashboard' && <Dashboard nodes={nodes} onSelectNode={selectNode}/>}
-        {page==='nodes'     && <NodesPage nodes={nodes} onReload={loadNodes} onManage={selectNode}/>}
+        {page==='dashboard' && <Dashboard nodes={nodes} onSelectNode={openNodeView} onManageNode={selectNode}/>}
+        {page==='nodes'     && <NodesPage nodes={nodes} onReload={loadNodes} onManage={selectNode} onOpenNode={openNodeView}/>}
+        {page==='node'      && selNodeView && <NodePage node={selNodeView} onBack={()=>{setPage('nodes');setSelNodeView(null);}} onManage={selectNode} onReload={loadNodes}/>}
         {page==='users' && !selNode && <AllUsers nodes={nodes} onSelectNode={selectNode}/>}
-        {page==='users' && selNode && <UsersPage node={selNode} onBack={()=>{setSelNode(null);setPage('users');}}/>}
+        {page==='users' && selNode  && <UsersPage node={selNode} onBack={()=>{setSelNode(null);setPage('users');}}/>}
         {page==='settings'  && <Settings/>}
       </main>
 

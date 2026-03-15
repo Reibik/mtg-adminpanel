@@ -1,0 +1,15 @@
+services:
+  mtg-agent:
+    image: python:3.12-alpine
+    container_name: mtg-agent
+    restart: unless-stopped
+    network_mode: host
+    pid: host                   # видит все PID хоста — читаем /proc/{pid}/net/tcp6
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /proc:/proc:ro
+      - ./main.py:/app/main.py:ro
+    working_dir: /app
+    environment:
+      - AGENT_TOKEN=${AGENT_TOKEN:-mtg-agent-secret}
+    command: sh -c "pip install --quiet fastapi uvicorn docker && uvicorn main:app --host 0.0.0.0 --port 8081"
