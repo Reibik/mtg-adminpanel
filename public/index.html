@@ -41,11 +41,12 @@
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html { font-size: 15px; }
+html { font-size: 16px; }
 body {
   background: var(--bg);
   color: var(--t1);
   font-family: var(--sans);
+  font-size: 15px;
   min-height: 100vh;
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
@@ -100,10 +101,10 @@ body {
 .nav-section { font-size: 10px; font-weight: 600; color: var(--t3); letter-spacing: 1.2px; text-transform: uppercase; padding: 12px 10px 6px; }
 .nav-item {
   display: flex; align-items: center; gap: 9px;
-  padding: 8px 10px; border-radius: 8px;
-  cursor: pointer; font-size: 13px; font-weight: 400;
+  padding: 10px 12px; border-radius: 8px;
+  cursor: pointer; font-size: 14px; font-weight: 400;
   color: var(--t2); transition: all var(--tx);
-  margin-bottom: 1px; user-select: none;
+  margin-bottom: 2px; user-select: none;
   position: relative; border: 1px solid transparent;
 }
 .nav-item svg { width: 15px; height: 15px; flex-shrink: 0; }
@@ -206,13 +207,13 @@ body {
 
 /* ─── BUTTONS ───────────────────────────────────────────── */
 .btn {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 7px 14px; border-radius: 8px; border: none;
-  cursor: pointer; font-size: 13px; font-weight: 500;
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 9px 18px; border-radius: 9px; border: none;
+  cursor: pointer; font-size: 14px; font-weight: 500;
   transition: all var(--tx); font-family: var(--sans);
   white-space: nowrap; line-height: 1;
 }
-.btn svg { width: 14px; height: 14px; flex-shrink: 0; }
+.btn svg { width: 15px; height: 15px; flex-shrink: 0; }
 .btn-primary {
   background: var(--grad); color: #fff;
   box-shadow: 0 0 20px rgba(124,111,247,0.3);
@@ -227,10 +228,10 @@ body {
 .btn-ghost:hover { background: var(--card); color: var(--t1); }
 .btn-danger { background: transparent; color: var(--re); border: 1px solid rgba(251,113,133,0.2); }
 .btn-danger:hover { background: rgba(251,113,133,0.08); border-color: rgba(251,113,133,0.4); }
-.btn-sm { padding: 5px 10px; font-size: 12px; border-radius: 6px; }
-.btn-sm svg { width: 12px; height: 12px; }
-.btn-icon { padding: 6px; width: 32px; height: 32px; justify-content: center; }
-.btn-icon svg { width: 15px; height: 15px; }
+.btn-sm { padding: 6px 13px; font-size: 13px; border-radius: 7px; }
+.btn-sm svg { width: 13px; height: 13px; }
+.btn-icon { padding: 7px; width: 34px; height: 34px; justify-content: center; }
+.btn-icon svg { width: 16px; height: 16px; }
 .btn:disabled { opacity: 0.35; cursor: not-allowed; transform: none !important; }
 
 /* ─── STAT CARDS ────────────────────────────────────────── */
@@ -315,9 +316,9 @@ body {
 
 /* ─── TABLE ─────────────────────────────────────────────── */
 .table-wrap { overflow-x: auto; }
-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
 th {
-  text-align: left; padding: 9px 14px;
+  text-align: left; padding: 11px 14px;
   color: var(--t3); font-weight: 500;
   font-size: 11px; text-transform: uppercase; letter-spacing: 0.7px;
   border-bottom: 1px solid var(--b1);
@@ -325,7 +326,7 @@ th {
   position: sticky; top: 0; z-index: 1;
 }
 td {
-  padding: 11px 14px; border-bottom: 1px solid var(--b1);
+  padding: 12px 14px; border-bottom: 1px solid var(--b1);
   vertical-align: middle;
 }
 tr:last-child td { border-bottom: none; }
@@ -729,6 +730,59 @@ function Login({ onLogin }) {
   );
 }
 
+/* ── Flag data & picker ─────────────────────────────────── */
+const COUNTRIES = [
+  {code:'ru',name:'Россия'},{code:'fi',name:'Финляндия'},{code:'us',name:'США'},
+  {code:'de',name:'Германия'},{code:'nl',name:'Нидерланды'},{code:'se',name:'Швеция'},
+  {code:'il',name:'Израиль'},{code:'gb',name:'Великобритания'},{code:'fr',name:'Франция'},
+  {code:'pl',name:'Польша'},{code:'ua',name:'Украина'},{code:'at',name:'Австрия'},
+  {code:'ch',name:'Швейцария'},{code:'tr',name:'Турция'},{code:'lt',name:'Литва'},
+  {code:'lv',name:'Латвия'},{code:'ee',name:'Эстония'},{code:'jp',name:'Япония'},
+  {code:'sg',name:'Сингапур'},{code:'au',name:'Австралия'},{code:'ca',name:'Канада'},
+  {code:'kz',name:'Казахстан'},{code:'am',name:'Армения'},{code:'ge',name:'Грузия'},
+];
+const flagUrl = (code) => code ? `https://flagcdn.com/20x15/${code}.png` : null;
+
+function FlagPicker({ value, onChange }) {
+  const [open, setOpen] = useState(false);
+  const current = COUNTRIES.find(c => c.code === value);
+  return (
+    <div style={{position:'relative'}}>
+      <div style={{display:'flex',alignItems:'center',gap:8,padding:'8px 11px',background:'var(--bg3)',border:'1px solid var(--b2)',borderRadius:9,cursor:'pointer',transition:'border-color var(--tx)'}}
+        onClick={()=>setOpen(!open)}>
+        {current ? (
+          <>
+            <img src={flagUrl(current.code)} alt={current.code} style={{width:20,height:15,objectFit:'cover',borderRadius:2}}/>
+            <span style={{fontSize:13,color:'var(--t1)'}}>{current.name}</span>
+          </>
+        ) : (
+          <span style={{fontSize:13,color:'var(--t3)'}}>Выбрать флаг...</span>
+        )}
+        <span style={{marginLeft:'auto',color:'var(--t3)',fontSize:10}}>▼</span>
+      </div>
+      {open && (
+        <div style={{position:'absolute',top:'calc(100% + 4px)',left:0,right:0,background:'var(--bg2)',border:'1px solid var(--b2)',borderRadius:10,padding:8,zIndex:100,boxShadow:'0 8px 32px rgba(0,0,0,.5)',maxHeight:200,overflowY:'auto'}}>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:4}}>
+            <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:3,padding:'6px 4px',borderRadius:7,cursor:'pointer',border:'1px solid transparent'}}
+              onClick={()=>{onChange(null);setOpen(false);}}>
+              <span style={{fontSize:16}}>🌐</span>
+              <span style={{fontSize:9,color:'var(--t3)'}}>нет</span>
+            </div>
+            {COUNTRIES.map(c => (
+              <div key={c.code}
+                style={{display:'flex',flexDirection:'column',alignItems:'center',gap:3,padding:'6px 4px',borderRadius:7,cursor:'pointer',border:`1px solid ${value===c.code?'rgba(124,111,247,.4)':'transparent'}`,background:value===c.code?'rgba(124,111,247,.1)':'transparent',transition:'all .15s'}}
+                onClick={()=>{onChange(c.code);setOpen(false);}}>
+                <img src={flagUrl(c.code)} alt={c.code} style={{width:20,height:15,objectFit:'cover',borderRadius:2}}/>
+                <span style={{fontSize:9,color:'var(--t3)',textAlign:'center',lineHeight:1.2}}>{c.name}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ── Version Block (sidebar btn + modal) ────────────────── */
 // Parse "mtg:2 | built 2026-02-28T14:06:37.762665Z" → { name:"mtg:2", date:"28 Feb 2026" }
 function parseVer(raw) {
@@ -872,9 +926,6 @@ function VersionBlock({ nodes }) {
               <div style={{fontSize:11,fontWeight:600,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'1px',marginBottom:8}}>
                 MTG прокси на нодах
               </div>
-              <div style={{fontSize:11,color:'var(--t3)',marginBottom:12,padding:'8px 12px',background:'var(--bg3)',borderRadius:8,border:'1px solid var(--b1)',lineHeight:1.6}}>
-                ℹ️ <code style={{fontFamily:'var(--mono)',color:'var(--t2)'}}>pull</code> = <code style={{fontFamily:'var(--mono)',color:'var(--t2)'}}>docker pull ninесекунд/mtg:2</code> — скачивает последний патч образа на ноду
-              </div>
               <table className="ver-table" style={{tableLayout:'fixed',width:'100%'}}>
                 <colgroup>
                   <col style={{width:'20%'}}/>
@@ -1008,7 +1059,10 @@ function Dashboard({ nodes, onSelectNode }) {
                   <div style={{display:'flex',alignItems:'center',gap:12}}>
                     <div className="node-icon"><I.Server/></div>
                     <div className="node-info">
-                      <div className="node-name">{node.name}</div>
+                      <div className="node-name" style={{display:'flex',alignItems:'center',gap:8}}>
+                        {node.name}
+                        {node.flag && <img src={flagUrl(node.flag)} alt={node.flag} style={{width:20,height:15,objectFit:'cover',borderRadius:2,opacity:.9}}/>}
+                      </div>
                       <div className="node-host">{node.host}</div>
                     </div>
                   </div>
@@ -1042,7 +1096,7 @@ function Dashboard({ nodes, onSelectNode }) {
 
 /* ── Node Modal ─────────────────────────────────────────── */
 function NodeModal({ node, onClose, onSave }) {
-  const [f, setF] = useState(node||{name:'',host:'',ssh_user:'root',ssh_port:22,base_dir:'/opt/mtg/users',start_port:4433,ssh_password:'',ssh_key:''});
+  const [f, setF] = useState(node||{name:'',host:'',ssh_user:'root',ssh_port:22,base_dir:'/opt/mtg/users',start_port:4433,ssh_password:'',ssh_key:'',flag:null});
   const [loading, setLoading] = useState(false);
   const [auth, setAuth] = useState(node?.ssh_key?'key':'password');
   const set = (k,v) => setF(x=>({...x,[k]:v}));
@@ -1068,6 +1122,10 @@ function NodeModal({ node, onClose, onSave }) {
         <div className="modal-body">
           <div className="form-group"><label className="form-label">Название *</label><input className="form-input" placeholder="Helsinki #1" value={f.name} onChange={e=>set('name',e.target.value)} autoFocus/></div>
           <div className="form-group"><label className="form-label">Host / IP *</label><input className="form-input" placeholder="hel.maks68.com" value={f.host} onChange={e=>set('host',e.target.value)}/></div>
+          <div className="form-group">
+            <label className="form-label">Флаг страны</label>
+            <FlagPicker value={f.flag} onChange={v=>set('flag',v)}/>
+          </div>
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
             <div className="form-group"><label className="form-label">SSH User</label><input className="form-input" placeholder="root" value={f.ssh_user} onChange={e=>set('ssh_user',e.target.value)}/></div>
             <div className="form-group"><label className="form-label">SSH Port</label><input className="form-input" type="number" placeholder="22" value={f.ssh_port} onChange={e=>set('ssh_port',parseInt(e.target.value))}/></div>
@@ -1180,7 +1238,10 @@ function NodesPage({ nodes, onReload, onManage }) {
                 <div style={{display:'flex',alignItems:'center',gap:12}}>
                   <div className="node-icon"><I.Server/></div>
                   <div className="node-info">
-                    <div className="node-name">{node.name}</div>
+                    <div className="node-name" style={{display:'flex',alignItems:'center',gap:8}}>
+                      {node.name}
+                      {node.flag && <img src={flagUrl(node.flag)} alt={node.flag} style={{width:20,height:15,objectFit:'cover',borderRadius:2,opacity:.9}}/>}
+                    </div>
                     <div className="node-host">{node.host}</div>
                   </div>
                 </div>
@@ -1441,6 +1502,18 @@ function UsersPage({ node, onBack }) {
     finally{setBusyFor(user.name,false);}
   };
 
+  const resetTraffic = async (user) => {
+    if(!confirm(`Сбросить трафик ${user.name}? Прокси будет перезапущен.`)) return;
+    setBusyFor(user.name+'_reset', true);
+    try {
+      await api('POST', `/api/nodes/${node.id}/users/${user.name}/reset-traffic`);
+      toast(`${user.name}: трафик сброшен`, 'success');
+      loadUsers(true);
+      setTimeout(()=>loadTraffic(), 1500);
+    } catch(e){toast(e.message,'error');}
+    finally{setBusyFor(user.name+'_reset', false);}
+  };
+
   const expiry = (expires_at) => {
     if(!expires_at) return null;
     const diff = new Date(expires_at) - new Date();
@@ -1483,8 +1556,9 @@ function UsersPage({ node, onBack }) {
           <div className="table-wrap">
             <table>
               <thead><tr>
-                <th>Юзер</th>
+                <th>Клиент</th>
                 <th>Порт</th>
+                <th>Онлайн</th>
                 <th>Подкл.</th>
                 <th>Трафик</th>
                 <th>Статус</th>
@@ -1493,20 +1567,33 @@ function UsersPage({ node, onBack }) {
                 <th>Действия</th>
               </tr></thead>
               <tbody>
-                {users.map(u => (
+                {users.map(u => {
+                  const traf = u.running
+                    ? traffic[u.name]
+                    : (u.traffic_rx_snap ? {rx:u.traffic_rx_snap, tx:u.traffic_tx_snap} : traffic[u.name]);
+                  return (
                   <tr key={u.id} style={{opacity:u.expired ? 0.5 : 1}}>
-                    <td><span style={{fontFamily:'var(--mono)',fontWeight:600,fontSize:13}}>{u.name}</span></td>
+                    <td><span style={{fontFamily:'var(--mono)',fontWeight:600,fontSize:14}}>{u.name}</span></td>
                     <td><span className="badge badge-purple">{u.port}</span></td>
                     <td>
-                      <span style={{fontFamily:'var(--mono)',color:'var(--vi)',cursor:'pointer',fontWeight:500,fontSize:13}}
+                      {u.is_online
+                        ? <span className="badge badge-green"><span className="dot dot-live"/>online</span>
+                        : <span style={{color:'var(--t3)',fontSize:12}}>—</span>}
+                    </td>
+                    <td>
+                      <span style={{fontFamily:'var(--mono)',color:'var(--vi)',cursor:'pointer',fontWeight:500,fontSize:14}}
                         onClick={()=>setChartU(chartU===u.name?null:u.name)} title="Показать график">
                         {u.connections}
                       </span>
                     </td>
                     <td>
-                      {traffic[u.name]
-                        ? <span className="traf"><span className="rx">↓{traffic[u.name].rx}</span><span className="tx"> ↑{traffic[u.name].tx}</span></span>
-                        : <span style={{color:'var(--t3)',fontSize:11}}>—</span>}
+                      {traf
+                        ? <span className="traf">
+                            <span className="rx">↓{traf.rx}</span>
+                            <span className="tx"> ↑{traf.tx}</span>
+                            {!u.running && u.traffic_rx_snap && <span style={{fontSize:10,color:'var(--t3)',marginLeft:4}} title="Снапшот на момент паузы">⏸</span>}
+                          </span>
+                        : <span style={{color:'var(--t3)',fontSize:12}}>—</span>}
                     </td>
                     <td>
                       <span className={`badge ${u.running?'badge-green':'badge-red'}`}>
@@ -1517,11 +1604,12 @@ function UsersPage({ node, onBack }) {
                     <td>
                       <div style={{display:'flex',flexDirection:'column',gap:3}}>
                         {u.expires_at && <div>{expiry(u.expires_at)}</div>}
-                        {u.traffic_limit_gb && <span style={{fontSize:10,color:'var(--t3)',fontFamily:'var(--mono)'}}>{u.traffic_limit_gb}GB</span>}
-                        {!u.expires_at && !u.traffic_limit_gb && <span style={{color:'var(--t3)',fontSize:11}}>∞</span>}
+                        {u.traffic_limit_gb && <span style={{fontSize:11,color:'var(--t3)',fontFamily:'var(--mono)'}}>{u.traffic_limit_gb}GB</span>}
+                        {!u.expires_at && !u.traffic_limit_gb && <span style={{color:'var(--t3)',fontSize:12}}>∞</span>}
+                        {u.traffic_reset_at && <span style={{fontSize:10,color:'var(--t3)'}} title={`Сброс: ${new Date(u.traffic_reset_at).toLocaleString('ru-RU')}`}>↺ сброшен</span>}
                       </div>
                     </td>
-                    <td style={{maxWidth:120,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',fontSize:12,color:'var(--t2)'}} title={u.note}>
+                    <td style={{maxWidth:120,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',fontSize:13,color:'var(--t2)'}} title={u.note}>
                       {u.note || <span style={{color:'var(--t3)'}}>—</span>}
                     </td>
                     <td>
@@ -1533,12 +1621,17 @@ function UsersPage({ node, onBack }) {
                         <button className="btn btn-icon btn-secondary btn-sm" onClick={()=>copyText(u.link)} title="Копировать ссылку"><I.Copy/></button>
                         <button className="btn btn-icon btn-secondary btn-sm" onClick={()=>setQrU(u)} title="QR-код"><I.QrCode/></button>
                         <button className="btn btn-icon btn-secondary btn-sm" onClick={()=>setEditU(u)} title="Редактировать"><I.Edit/></button>
+                        <button className="btn btn-icon btn-secondary btn-sm" onClick={()=>resetTraffic(u)}
+                          disabled={busy[u.name+'_reset']} title="Сбросить трафик (перезапуск прокси)">
+                          {busy[u.name+'_reset']?<span className="spin spin-sm"/>:<I.RefreshCw/>}
+                        </button>
                         <button className="btn btn-icon btn-danger btn-sm" onClick={()=>remove(u)} disabled={busy[u.name]} title="Удалить"><I.Trash/></button>
                       </div>
                     </td>
                   </tr>
-                ))}
-                {!users.length && <tr><td colSpan={8}><div className="empty"><div className="empty-icon"><I.Users/></div><div className="empty-title">Нет юзеров</div><div className="empty-desc">Добавь первого юзера</div></div></td></tr>}
+                  );
+                })}
+                {!users.length && <tr><td colSpan={9}><div className="empty"><div className="empty-icon"><I.Users/></div><div className="empty-title">Нет клиентов</div><div className="empty-desc">Добавь первого клиента</div></div></td></tr>}
               </tbody>
             </table>
           </div>
