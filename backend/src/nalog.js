@@ -40,7 +40,9 @@ function getProxyAgent() {
 
     if (proto === 'socks5' || proto === 'socks5h' || proto === 'socks4') {
       const { SocksProxyAgent } = require('socks-proxy-agent');
-      return new SocksProxyAgent(proxyUrl);
+      // socks5h = DNS resolution via proxy (critical for Docker / foreign servers)
+      const fixedUrl = proto === 'socks5' ? proxyUrl.replace(/^socks5:/i, 'socks5h:') : proxyUrl;
+      return new SocksProxyAgent(fixedUrl);
     }
 
     if (proto === 'http' || proto === 'https') {
@@ -108,7 +110,7 @@ async function authenticate() {
   if (!inn || !password) throw new Error('НПД: не указаны ИНН или пароль');
 
   const result = await request('POST', '/auth/lkfl', {
-    inn,
+    username: inn,
     password,
     deviceInfo: {
       sourceDeviceId: 'mtg-panel',
