@@ -938,7 +938,7 @@ function parseVer(raw) {
   return { name: raw.slice(0,20), date: null };
 }
 
-function VersionBlock({ nodes, panelVersion }) {
+function VersionBlock({ nodes, panelVersion, panelCommit }) {
   const [versions, setVersions] = useState({});
   const [agentVersions, setAgentVersions] = useState({});
   const [updating, setUpdating] = useState({});
@@ -1091,6 +1091,7 @@ function VersionBlock({ nodes, panelVersion }) {
                       <div style={{fontWeight:600,fontSize:13}}>Панель управления</div>
                       <div style={{fontSize:11,color:'var(--t3)',fontFamily:'var(--mono)',marginTop:3,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
                         <span>Установлена: <span style={{color:'var(--vi)'}}>{panelVersion || '...'}</span></span>
+                        {panelCommit && <span>Коммит: <span style={{color:'var(--cy)'}}>{panelCommit}</span></span>}
                         {checkingUpdates
                           ? <span style={{color:'var(--t3)',display:'inline-flex',alignItems:'center',gap:4}}><span className="spin spin-sm" style={{width:9,height:9}}/> проверяю...</span>
                           : updateInfo?.panel
@@ -2629,6 +2630,98 @@ function NpdSettings() {
   );
 }
 
+/* ── .env Settings (admin only) ─────────────────────────── */
+function EnvSettings() {
+  const [vars, setVars] = useState({});
+  const [groups, setGroups] = useState({});
+  const [sensitive, setSensitive] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [showSensitive, setShowSensitive] = useState({});
+
+  useEffect(() => {
+    api('GET', '/api/env-settings').then(r => {
+      setVars(r.vars || {});
+      setGroups(r.groups || {});
+      setSensitive(r.sensitive || []);
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  }, []);
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      const r = await api('POST', '/api/env-settings', { vars });
+      toast(r.message || 'Сохранено', 'success');
+    } catch (e) { toast(e.message, 'error'); }
+    finally { setSaving(false); }
+  };
+
+  if (loading) return <div className="card" style={{marginTop:24}}><div style={{padding:24,textAlign:'center'}}><span className="spin spin-sm"/></div></div>;
+
+  const isSensitive = (key) => sensitive.includes(key);
+  const allKeys = Object.values(groups).flat();
+  const extraKeys = Object.keys(vars).filter(k => !allKeys.includes(k));
+
+  return (
+    <div className="card" style={{marginTop:24}}>
+      <div className="card-header">
+        <div className="card-title"><I.Settings/> Переменные окружения (.env)</div>
+      </div>
+      <p style={{fontSize:12,color:'var(--t3)',marginBottom:16}}>
+        Редактирование файла .env. После сохранения нужен перезапуск контейнера для применения.
+      </p>
+
+      {Object.entries(groups).map(([group, keys]) => (
+        <div key={group} style={{marginBottom:16}}>
+          <div style={{fontSize:12,fontWeight:600,color:'var(--t2)',textTransform:'uppercase',letterSpacing:'0.5px',marginBottom:8,paddingBottom:4,borderBottom:'1px solid var(--b1)'}}>
+            {group}
+          </div>
+          <div style={{display:'grid',gap:8}}>
+            {keys.map(key => (
+              <div key={key} className="form-group" style={{marginBottom:0}}>
+                <label className="form-label" style={{fontSize:11,fontFamily:'var(--mono)',color:'var(--t3)'}}>{key}</label>
+                <div style={{position:'relative'}}>
+                  <input className="form-input" style={{fontSize:13,paddingRight: isSensitive(key)?36:12}}
+                    type={isSensitive(key) && !showSensitive[key] ? 'password' : 'text'}
+                    value={vars[key]||''} onChange={e => setVars(v => ({...v, [key]: e.target.value}))}/>
+                  {isSensitive(key) && (
+                    <button type="button" onClick={() => setShowSensitive(s => ({...s, [key]: !s[key]}))}
+                      style={{position:'absolute',right:8,top:'50%',transform:'translateY(-50%)',background:'none',border:'none',cursor:'pointer',color:'var(--t3)',padding:4}}>
+                      {showSensitive[key] ? React.createElement(I.EyeOff,{size:14}) : React.createElement(I.Eye,{size:14})}
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+
+      {extraKeys.length > 0 && (
+        <div style={{marginBottom:16}}>
+          <div style={{fontSize:12,fontWeight:600,color:'var(--t2)',textTransform:'uppercase',letterSpacing:'0.5px',marginBottom:8,paddingBottom:4,borderBottom:'1px solid var(--b1)'}}>
+            Прочие
+          </div>
+          <div style={{display:'grid',gap:8}}>
+            {extraKeys.map(key => (
+              <div key={key} className="form-group" style={{marginBottom:0}}>
+                <label className="form-label" style={{fontSize:11,fontFamily:'var(--mono)',color:'var(--t3)'}}>{key}</label>
+                <input className="form-input" style={{fontSize:13}} value={vars[key]||''}
+                  onChange={e => setVars(v => ({...v, [key]: e.target.value}))}/>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <button className="btn btn-primary" onClick={save} disabled={saving} style={{marginTop:8}}>
+        {saving ? <span className="spin spin-sm"/> : <><I.Save/> Сохранить .env</>}
+      </button>
+    </div>
+  );
+}
+
 /* ── Team Management (admin only) ───────────────────────── */
 function TeamManager() {
   const [users, setUsers] = useState([]);
@@ -2727,6 +2820,12 @@ function CustomersManager() {
   const [detail, setDetail] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [showCreateProxy, setShowCreateProxy] = useState(false);
+  const [nodes, setNodes] = useState([]);
+  const [plans, setPlans] = useState([]);
+  const [proxyForm, setProxyForm] = useState({ node_id: '', plan_id: '', period: 'monthly' });
+  const [creatingProxy, setCreatingProxy] = useState(false);
+  const [deletingProxy, setDeletingProxy] = useState({});
 
   const load = () => { api('GET','/api/customers').then(setCustomers).catch(()=>{}).finally(()=>setLoading(false)); };
   useEffect(()=>{ load(); },[]);
@@ -2767,6 +2866,40 @@ function CustomersManager() {
   const cancelOrder = async (orderId) => {
     try { await api('PUT',`/api/orders/${orderId}/status`,{status:'cancelled'}); toast('Заказ отменён','success'); openDetail(selected); }
     catch(e){ toast(e.message,'error'); }
+  };
+
+  const openCreateProxy = async () => {
+    setShowCreateProxy(true);
+    if (!nodes.length) {
+      try { const n = await api('GET', '/api/nodes'); setNodes(n || []); } catch {}
+    }
+    if (!plans.length) {
+      try { const p = await api('GET', '/api/plans'); setPlans(p || []); } catch {}
+    }
+  };
+
+  const createProxy = async () => {
+    if (!proxyForm.node_id) { toast('Выберите ноду', 'error'); return; }
+    setCreatingProxy(true);
+    try {
+      const r = await api('POST', `/api/customers/${selected.id}/create-proxy`, proxyForm);
+      toast(`Прокси создан: ${r.user_name}`, 'success');
+      setShowCreateProxy(false);
+      setProxyForm({ node_id: '', plan_id: '', period: 'monthly' });
+      openDetail(selected);
+    } catch (e) { toast(e.message, 'error'); }
+    finally { setCreatingProxy(false); }
+  };
+
+  const deleteProxy = async (orderId) => {
+    if (!confirm('Удалить прокси и отменить заказ?')) return;
+    setDeletingProxy(d => ({ ...d, [orderId]: true }));
+    try {
+      await api('DELETE', `/api/customers/${selected.id}/orders/${orderId}/proxy`);
+      toast('Прокси удалён', 'success');
+      openDetail(selected);
+    } catch (e) { toast(e.message, 'error'); }
+    finally { setDeletingProxy(d => ({ ...d, [orderId]: false })); }
   };
 
   const filtered = customers.filter(c => {
@@ -2838,20 +2971,77 @@ function CustomersManager() {
 
             {/* Orders */}
             <div className="card">
-              <div className="card-header"><div className="card-title"><I.Tag/> Заказы ({(detail.orders||[]).length})</div></div>
+              <div className="card-header">
+                <div className="card-title"><I.Tag/> Заказы ({(detail.orders||[]).length})</div>
+                <button className="btn btn-primary btn-sm" onClick={openCreateProxy}><I.Plus/> Создать прокси</button>
+              </div>
+
+              {showCreateProxy && (
+                <div style={{background:'var(--bg3)',border:'1px solid var(--b1)',borderRadius:10,padding:16,marginBottom:16}}>
+                  <div style={{fontSize:13,fontWeight:600,marginBottom:12}}>Создать прокси для клиента</div>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:12}}>
+                    <div className="form-group" style={{marginBottom:0}}>
+                      <label className="form-label">Нода *</label>
+                      <select className="form-input" value={proxyForm.node_id}
+                        onChange={e => setProxyForm(f => ({...f, node_id: parseInt(e.target.value)||''}))}>
+                        <option value="">Выберите...</option>
+                        {nodes.map(n => <option key={n.id} value={n.id}>{n.name} ({n.host})</option>)}
+                      </select>
+                    </div>
+                    <div className="form-group" style={{marginBottom:0}}>
+                      <label className="form-label">Тариф</label>
+                      <select className="form-input" value={proxyForm.plan_id}
+                        onChange={e => setProxyForm(f => ({...f, plan_id: parseInt(e.target.value)||''}))}>
+                        <option value="">Без тарифа (бесплатный)</option>
+                        {plans.map(p => <option key={p.id} value={p.id}>{p.name} — {p.price} {p.currency}</option>)}
+                      </select>
+                    </div>
+                    <div className="form-group" style={{marginBottom:0}}>
+                      <label className="form-label">Период</label>
+                      <select className="form-input" value={proxyForm.period}
+                        onChange={e => setProxyForm(f => ({...f, period: e.target.value}))}>
+                        <option value="daily">День</option>
+                        <option value="monthly">Месяц</option>
+                        <option value="yearly">Год</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div style={{display:'flex',gap:8,marginTop:12}}>
+                    <button className="btn btn-ghost btn-sm" onClick={() => setShowCreateProxy(false)}>Отмена</button>
+                    <button className="btn btn-primary btn-sm" onClick={createProxy} disabled={creatingProxy}>
+                      {creatingProxy ? <span className="spin spin-sm"/> : <><I.Plus/> Создать</>}
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {(detail.orders||[]).length===0 ? <p style={{color:'var(--t3)',fontSize:13}}>Нет заказов</p> : (
                 <div className="tbl-wrap"><table className="tbl">
-                  <thead><tr><th>#</th><th>Тариф</th><th>Статус</th><th>Цена</th><th>Период</th><th>Истекает</th><th>Создан</th><th></th></tr></thead>
+                  <thead><tr><th>#</th><th>Тариф</th><th>Статус</th><th>Прокси</th><th>Цена</th><th>Период</th><th>Истекает</th><th></th></tr></thead>
                   <tbody>{(detail.orders||[]).map(o => (
                     <tr key={o.id}>
                       <td style={{fontFamily:'var(--mono)',fontSize:12}}>{o.id}</td>
                       <td>{o.plan_id||'—'}</td>
                       <td><span className={`badge ${ORDER_BADGE[o.status]||''}`}>{o.status}</span></td>
+                      <td style={{fontSize:11,fontFamily:'var(--mono)',maxWidth:180,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                        {o.user_name ? <span title={o.user_name} style={{color:'var(--cy)'}}>{o.user_name}</span> : '—'}
+                      </td>
                       <td>{o.price} {o.currency}</td>
                       <td>{o.period==='monthly'?'Мес.':o.period==='yearly'?'Год':'День'}</td>
                       <td style={{fontSize:12}}>{o.expires_at?new Date(o.expires_at).toLocaleDateString('ru'):'—'}</td>
-                      <td style={{fontSize:12}}>{new Date(o.created_at).toLocaleDateString('ru')}</td>
-                      <td>{o.status==='active'||o.status==='pending'?<button className="btn btn-ghost btn-sm" style={{color:'var(--re)'}} onClick={()=>cancelOrder(o.id)}>Отменить</button>:null}</td>
+                      <td>
+                        <div style={{display:'flex',gap:4}}>
+                          {o.status==='active' && o.user_name && (
+                            <button className="btn btn-ghost btn-sm" style={{color:'var(--re)'}}
+                              onClick={() => deleteProxy(o.id)} disabled={deletingProxy[o.id]}>
+                              {deletingProxy[o.id] ? <span className="spin spin-sm"/> : <><I.X/> Удалить прокси</>}
+                            </button>
+                          )}
+                          {(o.status==='active'||o.status==='pending') && !o.user_name && (
+                            <button className="btn btn-ghost btn-sm" style={{color:'var(--re)'}} onClick={()=>cancelOrder(o.id)}>Отменить</button>
+                          )}
+                        </div>
+                      </td>
                     </tr>
                   ))}</tbody>
                 </table></div>
@@ -3193,6 +3383,7 @@ function App() {
   const [selNode, setSelNode] = useState(null);      // for users page
   const [selNodeView, setSelNodeView] = useState(null); // for node detail page
   const [panelVersion, setPanelVersion] = useState(null);
+  const [panelCommit, setPanelCommit] = useState(null);
   const toasts = useToast();
 
   const loadNodes = useCallback(async () => {
@@ -3211,7 +3402,10 @@ function App() {
 
   useEffect(() => {
     api('GET', '/api/version')
-      .then(r => setPanelVersion(r.version ? (r.version.startsWith('v') ? r.version : `v${r.version}`) : null))
+      .then(r => {
+        setPanelVersion(r.version ? (r.version.startsWith('v') ? r.version : `v${r.version}`) : null);
+        if (r.commit) setPanelCommit(r.commit);
+      })
       .catch(() => {});
   }, []);
 
@@ -3264,7 +3458,7 @@ function App() {
           ))}
         </nav>
 
-        <VersionBlock nodes={nodes} panelVersion={panelVersion}/>
+        <VersionBlock nodes={nodes} panelVersion={panelVersion} panelCommit={panelCommit}/>
 
         <div className="sidebar-footer">
           {role!=='admin' && <div style={{padding:'6px 10px',fontSize:11,color:'var(--t3)',textAlign:'center'}}>
@@ -3287,7 +3481,7 @@ function App() {
         {page==='plans'     && <PlansManager/>}
         {page==='database'  && <DatabaseManager/>}
         {page==='announcements' && <AnnouncementsManager/>}
-        {page==='settings'  && <><Settings/><NpdSettings/><TeamManager/></>}
+        {page==='settings'  && <><Settings/><NpdSettings/><EnvSettings/><TeamManager/></>}
       </main>
 
       <nav className="mobile-bar">

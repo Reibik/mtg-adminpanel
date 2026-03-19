@@ -57,9 +57,16 @@ app.use('/admin', express.static(path.join(__dirname, '../public')));
 const clientDistPath = path.join(__dirname, '../public-client');
 app.use(express.static(clientDistPath));
 
+// ── Git commit hash ───────────────────────────────────────
+let gitCommit = null;
+try {
+  const { execFileSync } = require('child_process');
+  gitCommit = execFileSync('git', ['-C', '/repo', 'rev-parse', '--short', 'HEAD'], { timeout: 5000 }).toString().trim();
+} catch (_) {}
+
 // ── Public endpoints (no auth) ────────────────────────────
 app.get('/api/version', (req, res) => {
-  res.json({ version: pkgVersion });
+  res.json({ version: pkgVersion, commit: gitCommit });
 });
 
 // ── Check for updates (panel + agent from GitHub) ─────────
@@ -331,6 +338,91 @@ app.post('/api/npd/test', async (req, res) => {
   } catch (e) {
     res.status(400).json({ error: e.message });
   }
+});
+
+// ── .env Settings (admin only) ────────────────────────────
+const ENV_PATH = '/repo/.env';
+const ENV_GROUPS = {
+  'Основные': ['AUTH_TOKEN', 'PORT', 'DATA_DIR', 'JWT_SECRET'],
+  'YooKassa': ['YOOKASSA_SHOP_ID', 'YOOKASSA_SECRET_KEY'],
+  'SMTP (Почта)': ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'SMTP_FROM'],
+  'Telegram': ['TELEGRAM_BOT_TOKEN', 'TELEGRAM_BOT_USERNAME'],
+  'URLs': ['SITE_URL'],
+};
+const SENSITIVE_KEYS = new Set(['AUTH_TOKEN', 'JWT_SECRET', 'YOOKASSA_SECRET_KEY', 'SMTP_PASS', 'TELEGRAM_BOT_TOKEN']);
+
+app.get('/api/env-settings', (req, res) => {
+  if (req.adminRole !== 'admin') return res.status(403).json({ error: 'Только admin' });
+  try {
+    if (!fs.existsSync(ENV_PATH)) return res.json({ vars: {}, groups: ENV_GROUPS });
+    const content = fs.readFileSync(ENV_PATH, 'utf8');
+    const vars = {};
+    for (const line of content.split('\n')) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+      const eq = trimmed.indexOf('=');
+      if (eq === -1) continue;
+      const key = trimmed.slice(0, eq).trim();
+      let val = trimmed.slice(eq + 1).trim();
+      vars[key] = SENSITIVE_KEYS.has(key) ? '••••••••' : val;
+    }
+    res.json({ vars, groups: ENV_GROUPS, sensitive: [...SENSITIVE_KEYS] });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/env-settings', (req, res) => {
+  if (req.adminRole !== 'admin') return res.status(403).json({ error: 'Только admin' });
+  try {
+    const { vars } = req.body;
+    if (!vars || typeof vars !== 'object') return res.status(400).json({ error: 'vars обязателен' });
+
+    // Read existing .env to preserve sensitive values and comments
+    let existingVars = {};
+    let header = '';
+    if (fs.existsSync(ENV_PATH)) {
+      const content = fs.readFileSync(ENV_PATH, 'utf8');
+      const headerLines = [];
+      for (const line of content.split('\n')) {
+        const trimmed = line.trim();
+        if (trimmed.startsWith('#') || !trimmed) {
+          if (Object.keys(existingVars).length === 0) headerLines.push(line);
+          continue;
+        }
+        const eq = trimmed.indexOf('=');
+        if (eq === -1) continue;
+        existingVars[trimmed.slice(0, eq).trim()] = trimmed.slice(eq + 1).trim();
+      }
+      header = headerLines.join('\n');
+    }
+
+    // Merge: keep sensitive values if masked
+    const merged = { ...existingVars };
+    for (const [key, val] of Object.entries(vars)) {
+      if (SENSITIVE_KEYS.has(key) && val === '••••••••') continue; // keep existing
+      merged[key] = val;
+    }
+
+    // Build .env content grouped
+    const lines = header ? [header, ''] : [];
+    const written = new Set();
+    for (const [group, keys] of Object.entries(ENV_GROUPS)) {
+      lines.push(`# ${group}`);
+      for (const key of keys) {
+        if (merged[key] !== undefined) {
+          lines.push(`${key}=${merged[key]}`);
+          written.add(key);
+        }
+      }
+      lines.push('');
+    }
+    // Any extra vars not in groups
+    for (const [key, val] of Object.entries(merged)) {
+      if (!written.has(key)) lines.push(`${key}=${val}`);
+    }
+
+    fs.writeFileSync(ENV_PATH, lines.join('\n').trimEnd() + '\n');
+    res.json({ ok: true, message: 'Настройки сохранены. Для применения изменений перезапустите контейнер.' });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // ── Nodes ─────────────────────────────────────────────────

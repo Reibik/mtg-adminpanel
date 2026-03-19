@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
+const ssh = require('../ssh');
 const yookassa = require('../yookassa');
 
 // All routes here are under /api and protected by admin AUTH_TOKEN middleware (already in app.js)
@@ -161,6 +162,89 @@ router.delete('/customers/:id', (req, res) => {
   db.prepare('DELETE FROM sessions WHERE customer_id = ?').run(req.params.id);
   db.prepare('DELETE FROM customers WHERE id = ?').run(req.params.id);
   res.json({ ok: true });
+});
+
+// Create proxy for customer (admin)
+router.post('/customers/:id/create-proxy', async (req, res) => {
+  const { node_id, plan_id, period } = req.body;
+  if (!node_id) return res.status(400).json({ error: 'node_id обязателен' });
+
+  const customer = db.prepare('SELECT * FROM customers WHERE id = ?').get(req.params.id);
+  if (!customer) return res.status(404).json({ error: 'Клиент не найден' });
+
+  const node = db.prepare('SELECT * FROM nodes WHERE id = ?').get(node_id);
+  if (!node) return res.status(404).json({ error: 'Нода не найдена' });
+
+  const plan = plan_id ? db.prepare('SELECT * FROM plans WHERE id = ?').get(plan_id) : null;
+  const usePeriod = period || (plan ? plan.period : 'monthly');
+
+  try {
+    // Create order
+    const orderResult = db.prepare(
+      `INSERT INTO orders (customer_id, plan_id, status, config, price, currency, period)
+       VALUES (?, ?, 'pending', '{}', ?, ?, ?)`
+    ).run(customer.id, plan_id || null, plan ? plan.price : 0, plan ? plan.currency : 'RUB', usePeriod);
+    const orderId = orderResult.lastInsertRowid;
+
+    // Generate unique username
+    const userName = `c${customer.id}_${orderId}`;
+
+    // Create proxy via SSH
+    const { port, secret } = await ssh.createRemoteUser(node, userName);
+
+    // Calculate expiry
+    let expiresAt = new Date();
+    if (usePeriod === 'daily') expiresAt.setDate(expiresAt.getDate() + 1);
+    else if (usePeriod === 'yearly') expiresAt.setFullYear(expiresAt.getFullYear() + 1);
+    else expiresAt.setMonth(expiresAt.getMonth() + 1);
+
+    // Insert into users table
+    db.prepare(
+      `INSERT INTO users (node_id, name, port, secret, status, max_devices, expires_at)
+       VALUES (?, ?, ?, ?, 'active', ?, ?)`
+    ).run(node.id, userName, port, secret, plan ? plan.max_devices : 3, expiresAt.toISOString());
+
+    // Update order to active
+    db.prepare(
+      `UPDATE orders SET status = 'active', node_id = ?, user_name = ?,
+       paid_at = datetime('now'), expires_at = ? WHERE id = ?`
+    ).run(node.id, userName, expiresAt.toISOString(), orderId);
+
+    res.json({
+      ok: true,
+      order_id: orderId,
+      user_name: userName,
+      port, secret,
+      link: `tg://proxy?server=${node.host}&port=${port}&secret=${secret}`,
+      expires_at: expiresAt.toISOString(),
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Delete proxy from order (admin)
+router.delete('/customers/:customerId/orders/:orderId/proxy', async (req, res) => {
+  const order = db.prepare(
+    'SELECT * FROM orders WHERE id = ? AND customer_id = ?'
+  ).get(req.params.orderId, req.params.customerId);
+  if (!order) return res.status(404).json({ error: 'Заказ не найден' });
+
+  try {
+    if (order.node_id && order.user_name) {
+      const node = db.prepare('SELECT * FROM nodes WHERE id = ?').get(order.node_id);
+      if (node) {
+        try { await ssh.removeRemoteUser(node, order.user_name); } catch (e) {
+          console.error(`Failed to remove proxy ${order.user_name}:`, e.message);
+        }
+      }
+      db.prepare('DELETE FROM users WHERE node_id = ? AND name = ?').run(order.node_id, order.user_name);
+    }
+    db.prepare("UPDATE orders SET status = 'cancelled', node_id = NULL, user_name = NULL WHERE id = ?").run(order.id);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // Cancel / delete order (admin)
