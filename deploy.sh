@@ -3,10 +3,13 @@ cd /tmp
 set +H
 
 # ============================================================
-#  ST VILLAGE PROXY — Deploy Script v2.0
+#  ST VILLAGE PROXY — Deploy Script v3.0
 #  Полная установка на VPS: Docker + Nginx + SSL + Firewall
 #  Использование: curl -sL <url>/deploy.sh | sudo bash
 # ============================================================
+
+export DEBIAN_FRONTEND=noninteractive
+export NEEDRESTART_MODE=a
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -29,7 +32,7 @@ print_header() {
     clear
     echo ""
     echo -e "${CYAN}  ╔═══════════════════════════════════════════════════════╗${NC}"
-    echo -e "${CYAN}  ║${NC}  ${BOLD}⚡ ST VILLAGE PROXY${NC}  ${DIM}— Deploy Script v2.0${NC}            ${CYAN}║${NC}"
+    echo -e "${CYAN}  ║${NC}  ${BOLD}⚡ ST VILLAGE PROXY${NC}  ${DIM}— Deploy Script v3.0${NC}            ${CYAN}║${NC}"
     echo -e "${CYAN}  ║${NC}  ${DIM}Панель управления + клиентский сайт + админка${NC}      ${CYAN}║${NC}"
     echo -e "${CYAN}  ╚═══════════════════════════════════════════════════════╝${NC}"
     echo ""
@@ -75,18 +78,29 @@ ask_secret() {
     eval "$var_name=\$_val"
 }
 
-spinner() {
-    local pid=$1 msg="$2"
-    local chars='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
+# Выполняет команду с live-прогрессом (точки каждые 2 сек)
+run_live() {
+    local msg="$1"; shift
+    echo -ne "  ${CYAN}▶${NC} $msg "
+    "$@" >> "$LOG_FILE" 2>&1 &
+    local pid=$!
+    local elapsed=0
     while kill -0 "$pid" 2>/dev/null; do
-        for (( i=0; i<${#chars}; i++ )); do
-            echo -ne "\r  ${CYAN}${chars:$i:1}${NC} $msg" >&2
-            sleep 0.1
-        done
+        sleep 2
+        elapsed=$((elapsed + 2))
+        echo -ne "."
     done
-    echo -ne "\r" >&2
+    wait "$pid"
+    local rc=$?
+    if [ $rc -eq 0 ]; then
+        echo -e " ${GREEN}✓${NC} ${DIM}(${elapsed}s)${NC}"
+    else
+        echo -e " ${RED}✗${NC} ${DIM}(код $rc, лог: $LOG_FILE)${NC}"
+    fi
+    return $rc
 }
 
+# Выполняет команду тихо (для быстрых операций)
 run_quiet() {
     local msg="$1"; shift
     echo -ne "  ${CYAN}⠋${NC} $msg"
@@ -96,7 +110,7 @@ run_quiet() {
     if [ $rc -eq 0 ]; then
         print_ok "$msg"
     else
-        print_error "$msg (код $rc, подробности: $LOG_FILE)"
+        print_error "$msg (код $rc, лог: $LOG_FILE)"
     fi
     return $rc
 }
@@ -134,6 +148,8 @@ if [ "$UPDATE_MODE" = true ]; then
     print_step "Обновление ST VILLAGE PROXY..."
     divider
 
+    cd "$INSTALL_DIR"
+
     # Pull latest code
     if [ -d "$INSTALL_DIR/.git" ]; then
         run_quiet "Получение обновлений из git..." git -C "$INSTALL_DIR" pull --ff-only
@@ -141,14 +157,40 @@ if [ "$UPDATE_MODE" = true ]; then
         print_warn "Не git-репозиторий — пропускаем git pull"
     fi
 
-    # Rebuild
-    cd "$INSTALL_DIR"
-    print_step "Пересборка контейнера..."
+    # Stop
+    print_step "Остановка контейнера..."
     docker compose down >> "$LOG_FILE" 2>&1
-    docker compose up -d --build >> "$LOG_FILE" 2>&1
-    sleep 5
+    print_ok "Остановлен"
 
-    if docker ps --format '{{.Names}}' | grep -q mtg-panel; then
+    # Rebuild with live progress
+    run_live "Сборка Docker-образа" docker compose build --no-cache
+    if [ $? -ne 0 ]; then
+        print_error "Ошибка сборки! Последние строки лога:"
+        tail -15 "$LOG_FILE"
+        exit 1
+    fi
+
+    # Start
+    run_quiet "Запуск контейнера..." docker compose up -d
+
+    # Wait for healthy
+    print_step "Ожидание запуска..."
+    HEALTHY=false
+    for i in $(seq 1 30); do
+        if docker ps --format '{{.Names}}' 2>/dev/null | grep -q mtg-panel; then
+            PORT=$(grep -oP 'PORT=\K[0-9]+' "$INSTALL_DIR/.env" 2>/dev/null || echo "3000")
+            HTTP_CODE=$(curl -sf -o /dev/null -w '%{http_code}' --max-time 3 "http://127.0.0.1:$PORT/api/version" 2>/dev/null)
+            if [ "$HTTP_CODE" = "200" ]; then
+                HEALTHY=true
+                break
+            fi
+        fi
+        sleep 1
+        echo -ne "."
+    done
+    echo ""
+
+    if [ "$HEALTHY" = true ] || docker ps --format '{{.Names}}' | grep -q mtg-panel; then
         echo ""
         echo -e "  ${GREEN}╔═══════════════════════════════════════════╗${NC}"
         echo -e "  ${GREEN}║      ✓  Обновление завершено!             ║${NC}"
@@ -162,6 +204,8 @@ if [ "$UPDATE_MODE" = true ]; then
         echo ""
     else
         print_error "Контейнер не запустился!"
+        echo ""
+        docker logs mtg-panel --tail 20 2>&1
         print_info "Диагностика: docker logs mtg-panel"
         exit 1
     fi
@@ -234,7 +278,7 @@ if [ "$SSL_CHOICE" == "2" ]; then
     ask "  Email (для SSL-сертификата)" "" CERT_EMAIL
     SITE_URL="https://$DOMAIN"
 else
-    SERVER_IP=$(curl -s -4 --connect-timeout 5 ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}')
+    SERVER_IP=$(curl -sf -4 --connect-timeout 5 --max-time 10 ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}')
     SITE_URL="http://$SERVER_IP:$PORT"
 fi
 
@@ -270,8 +314,8 @@ echo -e "  ${BOLD}2/6  Подготовка системы${NC}"
 divider
 
 # ── System update ────────────────────────────────────────────
-run_quiet "Обновление пакетов..." apt-get update -qq
-run_quiet "Установка зависимостей..." apt-get install -y -qq curl wget git unzip ca-certificates gnupg lsb-release
+run_live "Обновление пакетов" apt-get update -qq -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold"
+run_live "Установка зависимостей" apt-get install -y -qq -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" curl wget git unzip ca-certificates gnupg lsb-release
 
 # ── Docker ───────────────────────────────────────────────────
 echo ""
@@ -279,18 +323,22 @@ echo -e "  ${BOLD}3/6  Docker${NC}"
 divider
 
 if ! command -v docker &> /dev/null; then
-    print_step "Установка Docker..."
-    curl -fsSL https://get.docker.com | sh >> "$LOG_FILE" 2>&1
+    run_live "Установка Docker (может занять 1-2 мин)" bash -c "curl -fsSL https://get.docker.com | sh"
     systemctl enable docker >> "$LOG_FILE" 2>&1
     systemctl start docker >> "$LOG_FILE" 2>&1
-    print_ok "Docker установлен"
+    if command -v docker &> /dev/null; then
+        print_ok "Docker установлен — $(docker --version | awk '{print $3}' | tr -d ',')"
+    else
+        print_error "Docker не установился! Проверьте лог: $LOG_FILE"
+        exit 1
+    fi
 else
     print_ok "Docker $(docker --version | awk '{print $3}' | tr -d ',')"
 fi
 
 if ! docker compose version &> /dev/null; then
     print_error "docker compose не найден!"
-    print_info "Установите docker compose plugin: apt install docker-compose-plugin"
+    print_info "Установите: apt install docker-compose-plugin"
     exit 1
 fi
 
@@ -362,34 +410,43 @@ divider
 cd "$INSTALL_DIR"
 docker compose down >> "$LOG_FILE" 2>&1
 
-print_step "Сборка Docker-образа (это может занять 1-2 мин)..."
-docker compose build >> "$LOG_FILE" 2>&1
+run_live "Сборка Docker-образа (1-3 мин)" docker compose build
 if [ $? -ne 0 ]; then
-    print_error "Ошибка сборки! Подробности: $LOG_FILE"
-    print_info "docker compose build 2>&1 | tail -30"
+    print_error "Ошибка сборки! Последние строки:"
+    echo ""
+    tail -20 "$LOG_FILE"
+    echo ""
+    print_info "Полный лог: $LOG_FILE"
     exit 1
 fi
-print_ok "Образ собран"
 
-docker compose up -d >> "$LOG_FILE" 2>&1
+run_quiet "Запуск контейнера..." docker compose up -d
+
+# ── Health check with retry ──────────────────────────────────
 print_step "Ожидание запуска..."
-sleep 5
+HEALTHY=false
+for i in $(seq 1 30); do
+    if docker ps --format '{{.Names}}' 2>/dev/null | grep -q mtg-panel; then
+        HTTP_CODE=$(curl -sf -o /dev/null -w '%{http_code}' --max-time 3 "http://127.0.0.1:$PORT/api/version" 2>/dev/null)
+        if [ "$HTTP_CODE" = "200" ]; then
+            HEALTHY=true
+            break
+        fi
+    fi
+    sleep 1
+    echo -ne "."
+done
+echo ""
 
-if docker ps --format '{{.Names}}' | grep -q mtg-panel; then
-    print_ok "Контейнер mtg-panel запущен"
+if [ "$HEALTHY" = true ]; then
+    print_ok "API отвечает (HTTP 200)"
+elif docker ps --format '{{.Names}}' | grep -q mtg-panel; then
+    print_warn "Контейнер запущен, но API ещё не готов — подождите 10-15 сек"
 else
     print_error "Контейнер не запустился!"
     echo ""
     docker logs mtg-panel --tail 20 2>&1
     exit 1
-fi
-
-# ── Health check ─────────────────────────────────────────────
-HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:$PORT/api/version 2>/dev/null)
-if [ "$HTTP_CODE" == "200" ]; then
-    print_ok "API отвечает (HTTP $HTTP_CODE)"
-else
-    print_warn "API вернул HTTP $HTTP_CODE — может потребоваться время на запуск"
 fi
 
 # ── Nginx + SSL ──────────────────────────────────────────────
@@ -399,7 +456,7 @@ divider
 
 if [ "$SSL_CHOICE" == "2" ] && [ -n "$DOMAIN" ]; then
 
-    run_quiet "Установка Nginx + Certbot..." apt-get install -y -qq nginx certbot python3-certbot-nginx
+    run_live "Установка Nginx + Certbot" apt-get install -y -qq -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" nginx certbot python3-certbot-nginx
 
     # Stop nginx temporarily if running
     systemctl stop nginx >> "$LOG_FILE" 2>&1
@@ -418,9 +475,7 @@ NGINX
     rm -f /etc/nginx/sites-enabled/default
     systemctl start nginx >> "$LOG_FILE" 2>&1
 
-    print_step "Получение SSL-сертификата для $DOMAIN..."
-    certbot certonly --webroot -w /var/www/html -d "$DOMAIN" \
-        --email "$CERT_EMAIL" --agree-tos --non-interactive >> "$LOG_FILE" 2>&1
+    run_live "Получение SSL-сертификата для $DOMAIN" certbot certonly --webroot -w /var/www/html -d "$DOMAIN" --email "$CERT_EMAIL" --agree-tos --non-interactive
 
     if [ $? -eq 0 ]; then
         print_ok "SSL-сертификат получен"
@@ -433,12 +488,11 @@ NGINX
 server {
     listen 80;
     server_name $DOMAIN;
-    
-    # ACME challenge for cert renewal
+
     location /.well-known/acme-challenge/ {
         root /var/www/html;
     }
-    
+
     location / {
         return 301 https://\$host\$request_uri;
     }
@@ -451,14 +505,12 @@ server {
     ssl_certificate     /etc/letsencrypt/live/$DOMAIN/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/$DOMAIN/privkey.pem;
 
-    # SSL hardening
     ssl_protocols TLSv1.2 TLSv1.3;
     ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384;
     ssl_prefer_server_ciphers off;
     ssl_session_cache shared:SSL:10m;
     ssl_session_timeout 1d;
 
-    # Security headers
     add_header X-Frame-Options "SAMEORIGIN" always;
     add_header X-Content-Type-Options "nosniff" always;
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
@@ -475,8 +527,6 @@ server {
         proxy_set_header X-Forwarded-Proto \$scheme;
         proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection "upgrade";
-
-        # Timeouts
         proxy_connect_timeout 60s;
         proxy_send_timeout 60s;
         proxy_read_timeout 60s;
@@ -526,7 +576,6 @@ fi
 # ── Systemd service ──────────────────────────────────────────
 print_step "Настройка автозапуска..."
 
-# Cleanup old service names if exist
 for old_svc in mtg-proxy mtg-adminpanel; do
     if [ -f "/etc/systemd/system/${old_svc}.service" ]; then
         systemctl disable "$old_svc" >> "$LOG_FILE" 2>&1
@@ -583,7 +632,7 @@ echo ""
 echo -e "  ${DIM}docker logs mtg-panel -f${NC}            — логи в реальном времени"
 echo -e "  ${DIM}docker restart mtg-panel${NC}             — перезапуск"
 echo -e "  ${DIM}docker exec -it mtg-panel sh${NC}         — войти в контейнер"
-echo -e "  ${DIM}cd $INSTALL_DIR && bash deploy.sh${NC}    — обновление"
+echo -e "  ${DIM}cd $INSTALL_DIR && bash update.sh${NC}    — обновление"
 echo -e "  ${DIM}systemctl status $SERVICE_NAME${NC}   — статус сервиса"
 echo -e "  ${DIM}nano $INSTALL_DIR/.env${NC}              — редактировать настройки"
 echo ""
