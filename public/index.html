@@ -1013,11 +1013,22 @@ function VersionBlock({ nodes, panelVersion, panelCommit }) {
   const updateAgent = async (node) => {
     setUpdatingAgent(u => ({...u, [node.id]: true}));
     try {
-      await api('POST', `/api/nodes/${node.id}/update-agent`);
-      toast(`${node.name}: Агент обновлён`, 'success');
-      setTimeout(checkVersions, 3000);
+      const r = await api('POST', `/api/nodes/${node.id}/update-agent`);
+      if (r.ok) {
+        toast(`${node.name}: Агент обновлён${r.version ? ' → ' + r.version : ''}`, 'success');
+        if (r.version) setAgentVersions(v => ({...v, [node.id]: r.version}));
+      } else {
+        toast(`${node.name}: Ошибка обновления агента`, 'error');
+      }
+      setTimeout(checkVersions, 5000);
     } catch(e) { toast(e.message, 'error'); }
     finally { setUpdatingAgent(u => ({...u, [node.id]: false})); }
+  };
+
+  const updateAllAgents = async () => {
+    for(const n of nodes) {
+      if (n.agent_port) await updateAgent(n);
+    }
   };
 
   const updateAllNodes = async () => {
@@ -1266,6 +1277,10 @@ function VersionBlock({ nodes, panelVersion, panelCommit }) {
               <button className="btn btn-secondary" onClick={updateAllNodes}
                 disabled={Object.values(updating).some(Boolean)}>
                 <I.Download/> Обновить все MTG
+              </button>
+              <button className="btn btn-secondary" onClick={updateAllAgents}
+                disabled={Object.values(updatingAgent).some(Boolean)}>
+                {Object.values(updatingAgent).some(Boolean) ? <><span className="spin spin-sm"/> Обновляю...</> : <><I.Upload/> Обновить все агенты</>}
               </button>
               <button className="btn btn-primary" onClick={()=>setOpen(false)}>Закрыть</button>
             </div>

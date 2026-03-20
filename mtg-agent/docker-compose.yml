@@ -13,9 +13,10 @@ services:
     environment:
       - AGENT_TOKEN=${AGENT_TOKEN:-mtg-agent-secret}
       - CACHE_TTL=${CACHE_TTL:-15}
-    command: sh -c "pip install --quiet --no-cache-dir fastapi uvicorn docker && uvicorn main:app --host 0.0.0.0 --port 8081 --log-level warning"
+      - AGENT_PORT=${AGENT_PORT:-8081}
+    command: sh -c "pip install --quiet --no-cache-dir fastapi uvicorn docker && exec uvicorn main:app --host 0.0.0.0 --port ${AGENT_PORT:-8081} --log-level warning"
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8081/health')"]
+      test: ["CMD", "sh", "-c", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:${AGENT_PORT:-8081}/health')\""]
       interval: 30s
       timeout: 5s
       retries: 3

@@ -261,9 +261,20 @@ async function startRemoteUser(node, name) {
   await sshExec(node, 'cd ' + node.base_dir + '/' + name + ' && docker compose start 2>/dev/null');
 }
 
+async function getAgentVersion(node) {
+  if (!node.agent_port) return null;
+  try {
+    const data = await agentFetch(node.host, node.agent_port, '/version');
+    return data.version || null;
+  } catch {
+    return null;
+  }
+}
+
 module.exports = {
   sshExec, checkNode, checkAgentHealth,
   getNodeStatus, getRemoteUsers, getTraffic,
   createRemoteUser, removeRemoteUser, stopRemoteUser, startRemoteUser,
   getAgentFullMetrics, getAgentSystem, agentContainerAction, agentContainerLogs,
+  getAgentVersion,
 };

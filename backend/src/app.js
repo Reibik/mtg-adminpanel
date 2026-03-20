@@ -787,21 +787,31 @@ app.post('/api/nodes/:id/update-agent', async (req, res) => {
   const node = db.prepare('SELECT * FROM nodes WHERE id = ?').get(req.params.id);
   if (!node) return res.status(404).json({ error: 'Not found' });
   const token = process.env.AGENT_TOKEN || 'mtg-agent-secret';
-  // Use wget (more universally available than curl), write to temp file
+  const agentPort = node.agent_port || 8081;
   const RAW = 'https://raw.githubusercontent.com/Reibik/mtg-adminpanel/main/mtg-agent';
   const cmd = [
     `mkdir -p /opt/mtg-agent && cd /opt/mtg-agent`,
-    `wget -q "${RAW}/main.py" -O main.py`,
-    `wget -q "${RAW}/docker-compose.yml" -O docker-compose.yml`,
-    `echo "AGENT_TOKEN=${token}" > .env`,
+    `wget -q "${RAW}/main.py" -O main.py || curl -fsSL "${RAW}/main.py" -o main.py`,
+    `wget -q "${RAW}/docker-compose.yml" -O docker-compose.yml || curl -fsSL "${RAW}/docker-compose.yml" -o docker-compose.yml`,
+    `printf "AGENT_TOKEN=${token}\\nAGENT_PORT=${agentPort}\\n" > .env`,
     `docker compose down 2>/dev/null || true`,
-    `docker compose up -d`,
+    `docker compose pull 2>/dev/null || true`,
+    `docker compose up -d --build 2>&1`,
+    `sleep 4`,
+    `curl -s -m 5 http://127.0.0.1:${agentPort}/version 2>/dev/null || echo '{"version":"starting"}'`,
+    `echo ""`,
     `echo "==> Done"`
   ].join(' && ');
   try {
     const r = await ssh.sshExec(node, cmd);
     const ok = r.output.includes('Done');
-    res.json({ ok, output: r.output.slice(-800) });
+    // Try to extract new version from output
+    let newVersion = null;
+    try {
+      const vMatch = r.output.match(/\{"version":"([^"]+)"\}/);
+      if (vMatch) newVersion = vMatch[1];
+    } catch {}
+    res.json({ ok, version: newVersion, output: r.output.slice(-1200) });
   } catch (e) {
     res.status(500).json({ ok: false, error: e.message });
   }
@@ -830,15 +840,17 @@ app.get('/api/nodes/:id/mtg-version', async (req, res) => {
   } catch (e) { res.json({ version: 'error', error: e.message }); }
 });
 
-// Check agent version on a node
+// Check agent version on a node (agent-first, SSH fallback)
 app.get('/api/nodes/:id/agent-version', async (req, res) => {
   const node = db.prepare('SELECT * FROM nodes WHERE id = ?').get(req.params.id);
   if (!node) return res.status(404).json({ error: 'Not found' });
-  if (!node.agent_port) return res.json({ version: null, reason: 'no agent_port' });
-  const port = parseInt(node.agent_port, 10);
-  if (!port || port < 1 || port > 65535) return res.json({ version: null, reason: 'invalid agent_port' });
+  if (!node.agent_port) return res.json({ version: null, reason: 'no_agent_port' });
+  // Try direct HTTP to agent
+  const ver = await ssh.getAgentVersion(node);
+  if (ver) return res.json({ version: ver });
+  // Fallback: SSH + curl
   try {
-    const r = await ssh.sshExec(node, `curl -s -m 5 http://127.0.0.1:${port}/version 2>/dev/null || echo '{"version":"unknown"}'`);
+    const r = await ssh.sshExec(node, `curl -s -m 5 http://127.0.0.1:${node.agent_port}/version 2>/dev/null || echo '{"version":"unknown"}'`);
     const parsed = JSON.parse((r.output||'{}').trim());
     res.json({ version: parsed.version || 'unknown' });
   } catch (e) { res.json({ version: 'error', error: e.message }); }
