@@ -97,6 +97,7 @@ export const ordersApi = {
   toggleAutoRenew: (id, enabled) => api.put(`/orders/${id}/auto-renew`, { enabled }),
   remove: (id) => api.delete(`/orders/${id}`),
   payWithBalance: (id) => api.post(`/orders/${id}/pay-balance`),
+  renew: (id) => api.post(`/orders/${id}/renew`),
 };
 
 // ── Proxies ───────────────────────────────────────────────

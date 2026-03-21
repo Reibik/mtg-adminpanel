@@ -11,7 +11,7 @@ import {
 import { Line } from 'react-chartjs-2';
 import {
   ArrowLeft, Copy, QrCode, Wifi, Clock,
-  Users, ToggleLeft, ToggleRight, Download, Upload, Signal
+  Users, ToggleLeft, ToggleRight, Download, Upload, Signal, RefreshCw
 } from 'lucide-react';
 import Spinner from '../components/ui/Spinner';
 
@@ -26,6 +26,7 @@ export default function ProxyDetail() {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [toggling, setToggling] = useState(false);
+  const [renewLoading, setRenewLoading] = useState(false);
   const toast = useToast();
 
   const load = () => {
@@ -191,6 +192,33 @@ export default function ProxyDetail() {
           <h3 className="font-semibold mb-4">История подключений (24ч)</h3>
           <div className="h-56">
             <Line data={chartData} options={chartOpts} />
+          </div>
+        </div>
+      )}
+
+      {/* Renew subscription */}
+      {order.status === 'active' && (
+        <div className="card">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-semibold flex items-center gap-2"><RefreshCw size={16} className="text-primary" /> Продлить подписку</h3>
+              <p className="text-sm text-gray-400 mt-1">
+                {daysLeft > 0 ? `Осталось ${daysLeft} дн. — продлите сейчас с баланса` : 'Подписка скоро истечёт — продлите сейчас'}
+              </p>
+            </div>
+            <button onClick={async () => {
+              setRenewLoading(true);
+              try {
+                const { data } = await ordersApi.renew(orderId);
+                toast.success(`Подписка продлена! Новый баланс: ${Number(data.new_balance).toFixed(2)} ₽`);
+                load();
+              } catch (err) {
+                toast.error(err.response?.data?.error || 'Ошибка при продлении');
+              } finally { setRenewLoading(false); }
+            }} disabled={renewLoading}
+              className="btn-primary flex items-center gap-2 shrink-0">
+              {renewLoading ? <Spinner size="sm" /> : <><RefreshCw size={16} /> Продлить</>}
+            </button>
           </div>
         </div>
       )}

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { proxiesApi, ordersApi } from '../api/client';
 import { useToast } from '../components/ui/Toast';
-import { Wifi, WifiOff, Globe, Clock, Users, ArrowRight, Trash2, X, AlertTriangle } from 'lucide-react';
+import { Wifi, WifiOff, Globe, Clock, Users, ArrowRight, Trash2, X, AlertTriangle, RefreshCw } from 'lucide-react';
 import Spinner from '../components/ui/Spinner';
 
 export default function Proxies() {
@@ -11,6 +11,7 @@ export default function Proxies() {
   const [loading, setLoading] = useState(true);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [renewing, setRenewing] = useState(null);
   const toast = useToast();
 
   const loadData = () => {
@@ -38,6 +39,17 @@ export default function Proxies() {
     } finally { setDeleting(false); }
   };
 
+  const handleRenew = async (orderId) => {
+    setRenewing(orderId);
+    try {
+      const { data } = await ordersApi.renew(orderId);
+      toast.success(`Подписка продлена! Новый баланс: ${Number(data.new_balance).toFixed(2)} ₽`);
+      loadData();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Ошибка при продлении');
+    } finally { setRenewing(null); }
+  };
+
   if (loading) return <div className="flex justify-center py-20"><Spinner size="lg" /></div>;
 
   // merge orders with proxy data (preserve order id/status)
@@ -60,7 +72,7 @@ export default function Proxies() {
   });
 
   const active = combined.filter(o => o.status === 'active');
-  const other = combined.filter(o => o.status !== 'active');
+  const other = combined.filter(o => o.status !== 'active' && o.status !== 'expired');
 
   const ProxyCard = ({ item }) => {
     const isActive = item.status === 'active';
@@ -96,9 +108,23 @@ export default function Proxies() {
             </div>
           )}
 
-          <div className="mt-3 flex items-center justify-end text-xs text-primary opacity-0 group-hover:opacity-100 transition">
-            Подробнее <ArrowRight size={12} className="ml-1" />
-          </div>
+          {isActive && (
+            <div className="mt-3 flex items-center gap-2" onClick={e => e.preventDefault()}>
+              <button
+                onClick={(e) => { e.stopPropagation(); handleRenew(item.id); }}
+                disabled={renewing === item.id}
+                className="btn-primary text-xs px-3 py-1.5 rounded-lg flex items-center gap-1.5 flex-1 justify-center"
+              >
+                {renewing === item.id ? <Spinner size="sm" /> : <><RefreshCw size={12} /> Продлить</>}
+              </button>
+            </div>
+          )}
+
+          {!isActive && (
+            <div className="mt-3 flex items-center justify-end text-xs text-primary opacity-0 group-hover:opacity-100 transition">
+              Подробнее <ArrowRight size={12} className="ml-1" />
+            </div>
+          )}
         </Link>
 
         {/* Delete button */}

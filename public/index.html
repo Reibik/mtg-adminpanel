@@ -3095,7 +3095,7 @@ function CustomersManager() {
             {/* Orders */}
             <div className="card">
               <div className="card-header">
-                <div className="card-title"><I.Tag/> Заказы ({(detail.orders||[]).length})</div>
+                <div className="card-title"><I.Tag/> Заказы ({(detail.orders||[]).filter(o=>o.status!=='expired').length})</div>
                 <button className="btn btn-primary btn-sm" onClick={openCreateProxy}><I.Plus/> Создать прокси</button>
               </div>
 
@@ -3138,10 +3138,10 @@ function CustomersManager() {
                 </div>
               )}
 
-              {(detail.orders||[]).length===0 ? <p style={{color:'var(--t3)',fontSize:13}}>Нет заказов</p> : (
+              {(detail.orders||[]).filter(o=>o.status!=='expired').length===0 ? <p style={{color:'var(--t3)',fontSize:13}}>Нет заказов</p> : (
                 <div className="tbl-wrap"><table className="tbl">
                   <thead><tr><th>#</th><th>Тариф</th><th>Статус</th><th>Прокси</th><th>Цена</th><th>Период</th><th>Истекает</th><th></th></tr></thead>
-                  <tbody>{(detail.orders||[]).map(o => (
+                  <tbody>{(detail.orders||[]).filter(o=>o.status!=='expired').map(o => (
                     <tr key={o.id}>
                       <td style={{fontFamily:'var(--mono)',fontSize:12}}>{o.id}</td>
                       <td>{o.plan_id||'—'}</td>

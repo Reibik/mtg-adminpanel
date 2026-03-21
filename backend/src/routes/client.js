@@ -541,6 +541,73 @@ router.put('/orders/:id/auto-renew', auth.authCustomer, (req, res) => {
   res.json({ ok: true, auto_renew: enabled ? 1 : 0 });
 });
 
+// ── Manual subscription renewal (extend from balance) ─────
+router.post('/orders/:id/renew', auth.authCustomer, async (req, res) => {
+  const order = db.prepare('SELECT * FROM orders WHERE id = ? AND customer_id = ?')
+    .get(req.params.id, req.customer.id);
+  if (!order) return res.status(404).json({ error: 'Заказ не найден' });
+  if (order.status !== 'active') return res.status(400).json({ error: 'Можно продлить только активный заказ' });
+
+  const plan = order.plan_id ? db.prepare('SELECT * FROM plans WHERE id = ?').get(order.plan_id) : null;
+  const price = plan ? plan.price : order.price;
+
+  const customer = db.prepare('SELECT * FROM customers WHERE id = ?').get(req.customer.id);
+  if (!customer) return res.status(404).json({ error: 'Клиент не найден' });
+  if ((customer.balance || 0) < price) {
+    return res.status(400).json({ error: `Недостаточно средств. На балансе: ${(customer.balance||0).toFixed(2)} ₽, нужно: ${price} ₽` });
+  }
+
+  try {
+    const deducted = db.prepare(
+      'UPDATE customers SET balance = balance - ? WHERE id = ? AND balance >= ?'
+    ).run(price, req.customer.id, price);
+    if (deducted.changes === 0) {
+      return res.status(400).json({ error: 'Недостаточно средств' });
+    }
+
+    let newExpiry = new Date(order.expires_at);
+    const period = order.period || 'monthly';
+    if (period === 'daily') newExpiry.setDate(newExpiry.getDate() + 1);
+    else if (period === 'yearly') newExpiry.setFullYear(newExpiry.getFullYear() + 1);
+    else newExpiry.setMonth(newExpiry.getMonth() + 1);
+
+    db.prepare('UPDATE orders SET expires_at = ? WHERE id = ?').run(newExpiry.toISOString(), order.id);
+    db.prepare('UPDATE users SET expires_at = ? WHERE node_id = ? AND name = ?')
+      .run(newExpiry.toISOString(), order.node_id, order.user_name);
+
+    const planName = plan ? plan.name : `Заказ #${order.id}`;
+    db.prepare(
+      `INSERT INTO payments (customer_id, order_id, yookassa_payment_id, amount, currency, status, method, description, confirmed_at)
+       VALUES (?, ?, ?, ?, ?, 'succeeded', 'balance', ?, datetime('now'))`
+    ).run(req.customer.id, order.id, `renew_${order.id}_${Date.now()}`,
+      price, order.currency || 'RUB', `Продление: ${planName}`);
+
+    if (nalog.isEnabled()) {
+      nalog.createReceipt({
+        amount: price,
+        customerName: customer.name || customer.email || customer.telegram_username || null,
+        description: 'Продление прокси-сервиса (с баланса)',
+        paymentDate: new Date().toISOString(),
+      }).catch(e => console.error('НПД receipt error:', e));
+    }
+
+    if (customer.email && customer.email_verified) {
+      mailer.sendPaymentReceiptEmail(customer.email, {
+        amount: price,
+        currency: order.currency || 'RUB',
+        description: `Продление: ${planName}`,
+        orderId: order.id,
+      }).catch(e => console.error('Renewal receipt email error:', e));
+    }
+
+    const updatedCustomer = db.prepare('SELECT balance FROM customers WHERE id = ?').get(req.customer.id);
+    res.json({ ok: true, new_balance: updatedCustomer.balance, expires_at: newExpiry.toISOString() });
+  } catch (e) {
+    console.error('Renew order error:', e);
+    res.status(500).json({ error: 'Ошибка при продлении: ' + e.message });
+  }
+});
+
 // ── Delete (cancel) order and remove proxy ────────────────
 router.delete('/orders/:id', auth.authCustomer, async (req, res) => {
   const order = db.prepare(
