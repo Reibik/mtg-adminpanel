@@ -97,13 +97,13 @@ async function checkVpnSubscription(customer) {
   // Priority: telegram_id
   if (customer.telegram_id) {
     const resp = await apiGet(`/users/by-telegram-id/${encodeURIComponent(customer.telegram_id)}`);
-    if (resp && resp.response) userData = resp.response;
+    if (resp && resp.response) userData = Array.isArray(resp.response) ? resp.response[0] : resp.response;
   }
 
   // Fallback: email
   if (!userData && customer.email) {
     const resp = await apiGet(`/users/by-email/${encodeURIComponent(customer.email)}`);
-    if (resp && resp.response) userData = resp.response;
+    if (resp && resp.response) userData = Array.isArray(resp.response) ? resp.response[0] : resp.response;
   }
 
   if (!userData) return { hasVpn: false, expiresAt: null };
