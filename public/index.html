@@ -60,6 +60,9 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* ─── SVG DEFAULT ────────────────────────────────────────── */
+svg { width: 16px; height: 16px; flex-shrink: 0; }
+
 /* ─── SCROLLBAR ─────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
@@ -2369,9 +2372,10 @@ function AllUsers({ nodes, onSelectNode }) {
   const [groups, setGroups] = useState({}); // { nodeId: users[] }
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const loadedOnce = useRef(false);
 
   const load = useCallback(async (silent=false) => {
-    if(silent) setRefreshing(true); else setLoading(true);
+    if(loadedOnce.current || silent) setRefreshing(true); else setLoading(true);
     try {
       const res = await Promise.all(nodes.map(async n => {
         try {
@@ -2384,6 +2388,7 @@ function AllUsers({ nodes, onSelectNode }) {
         } catch { return [n.id, []]; }
       }));
       setGroups(Object.fromEntries(res));
+      loadedOnce.current = true;
     } finally { setLoading(false); setRefreshing(false); }
   }, [nodes]);
 
