@@ -78,7 +78,7 @@ export default function Plans() {
   const handleFreeVpnOrder = async () => {
     setVpnOrdering(true);
     try {
-      await ordersApi.createFreeVpn({ location_flag: vpnLocFlag || undefined });
+      await ordersApi.createFreeVpn({ location_flag: selectedLoc || vpnLocFlag || undefined });
       toast.success('Бесплатный прокси активирован!');
       navigate('/proxies');
     } catch (err) {
@@ -230,9 +230,15 @@ export default function Plans() {
             <p className="text-sm text-gray-400">Выбран тариф:</p>
             <p className="font-bold">{selectedPlan.name} — {selectedPlan.price} ₽ / {selectedPlan.period === 'monthly' ? 'мес.' : selectedPlan.period === 'yearly' ? 'год' : 'день'}</p>
           </div>
-          <button onClick={() => setShowConfirm(true)} disabled={ordering} className="btn-primary px-8 flex items-center gap-2">
-            <Zap size={16} /> Оформить заказ
-          </button>
+          {vpnStatus?.hasVpn && vpnStatus?.freePlanId === selectedPlan.id && !vpnStatus?.hasFreeProxy ? (
+            <button onClick={handleFreeVpnOrder} disabled={vpnOrdering} className="px-8 flex items-center gap-2 py-2.5 rounded-xl font-semibold text-white transition bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 disabled:opacity-50">
+              {vpnOrdering ? <Spinner size="sm" /> : <><Gift size={16} /> Активировать бесплатно!</>}
+            </button>
+          ) : (
+            <button onClick={() => setShowConfirm(true)} disabled={ordering} className="btn-primary px-8 flex items-center gap-2">
+              <Zap size={16} /> Оформить заказ
+            </button>
+          )}
         </div>
       )}
 
