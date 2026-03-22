@@ -32,6 +32,14 @@
   --t1: #f1f1f8;
   --t2: #6e7490;
   --t3: #373d5a;
+  /* Aliases */
+  --primary: var(--vi);
+  --accent: var(--cy);
+  --success: var(--gr);
+  --danger: var(--re);
+  --warning: var(--am);
+  --ac: var(--cy);
+  --bg4: var(--bg3);
   /* Fonts */
   --sans: 'Geist', -apple-system, sans-serif;
   --mono: 'Geist Mono', 'JetBrains Mono', monospace;
@@ -72,6 +80,7 @@ body {
   top: 0; left: 0; bottom: 0;
   z-index: 100;
   transition: transform var(--tx);
+  background-image: radial-gradient(ellipse 80% 30% at 20% 0%, rgba(124,111,247,0.04) 0%, transparent 60%);
 }
 
 .sidebar-logo {
@@ -88,6 +97,11 @@ body {
   display: flex; align-items: center; justify-content: center;
   flex-shrink: 0;
   box-shadow: 0 0 20px rgba(124,111,247,0.4);
+  transition: box-shadow var(--tx), transform var(--tx);
+}
+.sidebar-logo:hover .logo-icon {
+  box-shadow: 0 0 28px rgba(124,111,247,0.55);
+  transform: scale(1.05);
 }
 .logo-icon svg { width: 18px; height: 18px; color: #fff; }
 .logo-texts {}
@@ -113,6 +127,7 @@ body {
   background: linear-gradient(135deg, rgba(124,111,247,0.15) 0%, rgba(56,189,248,0.06) 100%);
   color: var(--t1);
   border-color: rgba(124,111,247,0.2);
+  font-weight: 500;
 }
 .nav-item.active::before {
   content: '';
@@ -201,8 +216,9 @@ body {
 .page-title em {
   font-style: normal;
   background: var(--grad); -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
-.page-desc { font-size: 13px; color: var(--t3); margin-top: 3px; font-family: var(--mono); }
+.page-desc { font-size: 13px; color: var(--t3); margin-top: 3px; font-family: var(--mono); letter-spacing: 0.3px; }
 .topbar-right { display: flex; align-items: center; gap: 8px; }
 
 /* ─── BUTTONS ───────────────────────────────────────────── */
@@ -217,8 +233,10 @@ body {
 .btn-primary {
   background: var(--grad); color: #fff;
   box-shadow: 0 0 20px rgba(124,111,247,0.3);
+  position: relative;
 }
 .btn-primary:hover { opacity: 0.87; transform: translateY(-1px); box-shadow: 0 0 32px rgba(124,111,247,0.45); }
+.btn-primary:active { transform: translateY(0); opacity: 0.95; }
 .btn-secondary {
   background: var(--card2); color: var(--t1);
   border: 1px solid var(--b2);
@@ -232,6 +250,8 @@ body {
 .btn-sm svg { width: 13px; height: 13px; }
 .btn-icon { padding: 7px; width: 34px; height: 34px; justify-content: center; }
 .btn-icon svg { width: 16px; height: 16px; }
+.btn-warning { background: transparent; color: var(--am); border: 1px solid rgba(251,191,36,0.2); }
+.btn-warning:hover { background: rgba(251,191,36,0.08); border-color: rgba(251,191,36,0.4); }
 .btn:disabled { opacity: 0.35; cursor: not-allowed; transform: none !important; }
 
 /* ─── STAT CARDS ────────────────────────────────────────── */
@@ -241,10 +261,16 @@ body {
   border: 1px solid var(--b1);
   border-radius: 12px; padding: 18px 20px;
   position: relative; overflow: hidden;
-  transition: border-color var(--tx), transform var(--tx);
+  transition: border-color var(--tx), transform var(--tx), box-shadow var(--tx);
   cursor: default;
 }
-.stat-card:hover { border-color: var(--b2); transform: translateY(-2px); }
+.stat-card::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  background: var(--grad); opacity: 0;
+  transition: opacity var(--tx);
+}
+.stat-card:hover { border-color: var(--b2); transform: translateY(-2px); box-shadow: 0 8px 32px rgba(0,0,0,0.15); }
+.stat-card:hover::before { opacity: 1; }
 .stat-top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 16px; }
 .stat-icon {
   width: 36px; height: 36px; border-radius: 9px;
@@ -269,6 +295,7 @@ body {
   background: var(--card);
   border: 1px solid var(--b1);
   border-radius: 12px; padding: 20px;
+  transition: border-color var(--tx), box-shadow var(--tx);
 }
 .card-header {
   display: flex; align-items: center; justify-content: space-between;
@@ -288,7 +315,9 @@ body {
 .section-card {
   background: var(--card); border: 1px solid var(--b1);
   border-radius: 12px; padding: 20px;
+  transition: border-color var(--tx);
 }
+.section-card:hover { border-color: var(--b2); box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
 
 .grid-2 { display: grid; grid-template-columns: repeat(2,1fr); gap: 14px; }
 
@@ -307,7 +336,7 @@ body {
   background: var(--grad); opacity: 0;
   transition: opacity var(--tx);
 }
-.node-card:hover { border-color: rgba(124,111,247,0.3); transform: translateY(-3px); box-shadow: 0 12px 40px rgba(0,0,0,0.3); }
+.node-card:hover { border-color: rgba(124,111,247,0.3); transform: translateY(-3px); box-shadow: 0 12px 40px rgba(0,0,0,0.3), 0 0 0 1px rgba(124,111,247,0.1); }
 .node-card:hover::after { opacity: 1; }
 .node-head { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 16px; }
 .node-icon {
@@ -405,8 +434,8 @@ tbody tr:hover td { background: rgba(124,111,247,0.04); }
   border-radius: 16px; padding: 0;
   width: 100%; max-width: 480px;
   max-height: 90vh; overflow-y: auto;
-  animation: modal-in .22s var(--ease);
-  box-shadow: 0 32px 80px rgba(0,0,0,0.6);
+  animation: modal-in .25s var(--ease);
+  box-shadow: 0 32px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(124,111,247,0.06);
 }
 @keyframes modal-in { from{opacity:0;transform:scale(.95) translateY(10px)} to{opacity:1;transform:none} }
 .modal-head {
@@ -443,6 +472,8 @@ tbody tr:hover td { background: rgba(124,111,247,0.04); }
   font-size: 13px; min-width: 240px; max-width: 340px;
   animation: toast-in .25s var(--ease);
   box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+  backdrop-filter: blur(12px);
+  pointer-events: auto;
 }
 .toast svg { width: 15px; height: 15px; flex-shrink: 0; margin-top: 1px; }
 .toast.success { border-left: 3px solid var(--gr); }
@@ -473,9 +504,9 @@ tbody tr:hover td { background: rgba(124,111,247,0.04); }
 /* ─── EMPTY ─────────────────────────────────────────────── */
 .empty { text-align: center; padding: 56px 24px; color: var(--t3); }
 .empty-icon { margin-bottom: 16px; display: flex; justify-content: center; }
-.empty-icon svg { width: 40px; height: 40px; color: var(--t3); opacity: .4; }
-.empty-title { font-size: 14px; font-weight: 500; color: var(--t2); margin-bottom: 6px; }
-.empty-desc { font-size: 13px; }
+.empty-icon svg { width: 48px; height: 48px; color: var(--t3); opacity: .3; }
+.empty-title { font-size: 15px; font-weight: 600; color: var(--t2); margin-bottom: 6px; }
+.empty-desc { font-size: 13px; margin-bottom: 16px; }
 
 /* ─── TRAFFIC ───────────────────────────────────────────── */
 .traf { font-family: var(--mono); font-size: 11px; display: inline-flex; align-items: center; gap: 6px; }
@@ -486,8 +517,8 @@ tbody tr:hover td { background: rgba(124,111,247,0.04); }
 .acts { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
 
 /* ─── PAGE ENTER ────────────────────────────────────────── */
-.pg { animation: pg-in .22s var(--ease); }
-@keyframes pg-in { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:none} }
+.pg { animation: pg-in .3s var(--ease); }
+@keyframes pg-in { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:none} }
 
 /* ─── SECTION LABEL ─────────────────────────────────────── */
 .sec-lbl {
@@ -516,9 +547,10 @@ tbody tr:hover td { background: rgba(124,111,247,0.04); }
   background: var(--bg2);
   border: 1px solid var(--b2);
   border-radius: 20px; overflow: hidden;
-  box-shadow: 0 32px 80px rgba(0,0,0,0.5);
-  animation: modal-in .3s var(--ease);
+  box-shadow: 0 32px 80px rgba(0,0,0,0.5), 0 0 0 1px rgba(124,111,247,0.08);
+  animation: login-pop .4s var(--ease);
 }
+@keyframes login-pop { from{opacity:0;transform:scale(.92) translateY(20px)} to{opacity:1;transform:none} }
 .login-head {
   padding: 32px 28px 24px;
   text-align: center;
@@ -531,7 +563,9 @@ tbody tr:hover td { background: rgba(124,111,247,0.04); }
   display: inline-flex; align-items: center; justify-content: center;
   margin-bottom: 16px;
   box-shadow: 0 0 40px rgba(124,111,247,0.4);
+  animation: login-icon-glow 3s ease-in-out infinite alternate;
 }
+@keyframes login-icon-glow { from{box-shadow:0 0 40px rgba(124,111,247,0.4)} to{box-shadow:0 0 60px rgba(124,111,247,0.55),0 0 20px rgba(56,189,248,0.2)} }
 .login-icon svg { width: 28px; height: 28px; color: #fff; }
 .login-title {
   font-size: 22px; font-weight: 700; letter-spacing: -0.5px;
@@ -591,13 +625,33 @@ tbody tr:hover td { background: rgba(124,111,247,0.04); }
   * { -webkit-tap-highlight-color: transparent; }
 }
 
+.mobile-toggle {
+  display: none;
+  position: fixed; top: 12px; left: 12px; z-index: 201;
+  width: 40px; height: 40px; border-radius: 10px;
+  background: rgba(13,15,28,0.9); border: 1px solid var(--b2);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: var(--t1); cursor: pointer;
+  align-items: center; justify-content: center;
+  transition: background var(--tx), border-color var(--tx);
+}
+.mobile-toggle:hover { background: var(--card); border-color: var(--b3); }
+.mobile-toggle svg { width: 20px; height: 20px; }
+@media (max-width: 860px) { .mobile-toggle { display: flex; } }
+.sidebar-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,0.5); z-index: 99;
+}
+.sidebar-overlay.show { display: block; }
 .mobile-bar {
   display: none;
   position: fixed; bottom: 0; left: 0; right: 0;
   height: 64px;
-  background: rgba(13,15,28,0.95);
+  background: rgba(13,15,28,0.92);
   border-top: 1px solid var(--b1);
-  backdrop-filter: blur(20px);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
   z-index: 200; align-items: stretch;
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
@@ -610,6 +664,7 @@ tbody tr:hover td { background: rgba(124,111,247,0.04); }
   min-width: 0; padding: 4px 2px;
 }
 .mob-item.active { color: var(--vi); }
+.mob-item.active svg { filter: drop-shadow(0 0 6px rgba(124,111,247,0.5)); }
 .mob-item svg { width: 18px; height: 18px; flex-shrink: 0; }
 .mob-label { font-size: 9px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; text-align: center; padding: 0 1px; }
 .mobile-bar { overflow-x: hidden; gap: 0; }
@@ -670,6 +725,7 @@ const I = {
   Eye:     () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>,
   EyeOff:  () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" y1="2" x2="22" y2="22"/></svg>,
   Gift:    () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13"/><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"/><path d="M7.5 8a2.5 2.5 0 0 1 0-5A4.8 8 0 0 1 12 8a4.8 8 0 0 1 4.5-5 2.5 2.5 0 0 1 0 5"/></svg>,
+  Menu:    () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="18" x2="20" y2="18"/></svg>,
 };
 
 /* ── Auth ───────────────────────────────────────────────── */
@@ -1328,21 +1384,31 @@ function Dashboard({ nodes, onSelectNode, onManageNode }) {
 
       {/* 2 summary cards */}
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16,marginBottom:24}}>
-        <div className="card" style={{padding:'20px 24px'}}>
-          <div style={{fontSize:12,fontWeight:600,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'1px',marginBottom:10}}>Ноды</div>
-          <div style={{fontSize:42,fontWeight:800,letterSpacing:'-1.5px',color:'var(--t1)',lineHeight:1,marginBottom:14}}>{nodes.length}</div>
-          <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-            <StatPill count={onlineNodes} label="онлайн" color="34,197,94" dot="dot-live"/>
-            {nodes.length - onlineNodes > 0 && <StatPill count={nodes.length-onlineNodes} label="офлайн" color="251,113,133" dot=""/>}
+        <div className="card" style={{padding:0,overflow:'hidden',position:'relative'}}>
+          <div style={{height:2,background:'linear-gradient(90deg,#7c6ff7,#38bdf8)',opacity:0.7}} />
+          <div style={{padding:'20px 24px'}}>
+            <div style={{fontSize:12,fontWeight:600,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'1px',marginBottom:10,display:'flex',alignItems:'center',gap:6}}>
+              <I.Server/> Ноды
+            </div>
+            <div style={{fontSize:42,fontWeight:800,letterSpacing:'-1.5px',color:'var(--t1)',lineHeight:1,marginBottom:14}}>{nodes.length}</div>
+            <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+              <StatPill count={onlineNodes} label="онлайн" color="34,197,94" dot="dot-live"/>
+              {nodes.length - onlineNodes > 0 && <StatPill count={nodes.length-onlineNodes} label="офлайн" color="251,113,133" dot=""/>}
+            </div>
           </div>
         </div>
-        <div className="card" style={{padding:'20px 24px'}}>
-          <div style={{fontSize:12,fontWeight:600,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'1px',marginBottom:10}}>Клиенты</div>
-          <div style={{fontSize:42,fontWeight:800,letterSpacing:'-1.5px',color:'var(--t1)',lineHeight:1,marginBottom:14}}>{totalUsers}</div>
-          <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-            <StatPill count={activeProxies} label="активных" color="34,197,94" dot="dot-live"/>
-            {totalOnline > 0 && <StatPill count={totalOnline} label="онлайн" color="56,189,248" dot="dot-live"/>}
-            {stoppedProxies > 0 && <StatPill count={stoppedProxies} label="остановлен" color="251,113,133" dot=""/>}
+        <div className="card" style={{padding:0,overflow:'hidden',position:'relative'}}>
+          <div style={{height:2,background:'linear-gradient(90deg,#38bdf8,#34d399)',opacity:0.7}} />
+          <div style={{padding:'20px 24px'}}>
+            <div style={{fontSize:12,fontWeight:600,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'1px',marginBottom:10,display:'flex',alignItems:'center',gap:6}}>
+              <I.Users/> Клиенты
+            </div>
+            <div style={{fontSize:42,fontWeight:800,letterSpacing:'-1.5px',color:'var(--t1)',lineHeight:1,marginBottom:14}}>{totalUsers}</div>
+            <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+              <StatPill count={activeProxies} label="активных" color="34,197,94" dot="dot-live"/>
+              {totalOnline > 0 && <StatPill count={totalOnline} label="онлайн" color="56,189,248" dot="dot-live"/>}
+              {stoppedProxies > 0 && <StatPill count={stoppedProxies} label="остановлен" color="251,113,133" dot=""/>}
+            </div>
           </div>
         </div>
       </div>
@@ -1361,8 +1427,13 @@ function Dashboard({ nodes, onSelectNode, onManageNode }) {
 
               return (
                 <div className="card" key={node.id}
-                  style={{padding:0,overflow:'hidden',cursor:'pointer',transition:'border-color .15s'}}
-                  onClick={()=>onSelectNode(node)}>
+                  style={{padding:0,overflow:'hidden',cursor:'pointer',transition:'border-color .15s, box-shadow .15s, transform .15s'}}
+                  onClick={()=>onSelectNode(node)}
+                  onMouseEnter={e=>{ e.currentTarget.style.borderColor='rgba(124,111,247,0.25)'; e.currentTarget.style.transform='translateY(-2px)'; e.currentTarget.style.boxShadow='0 8px 32px rgba(0,0,0,0.2)'; }}
+                  onMouseLeave={e=>{ e.currentTarget.style.borderColor=''; e.currentTarget.style.transform=''; e.currentTarget.style.boxShadow=''; }}>
+
+                  {/* Gradient top line */}
+                  <div style={{height:2,background:s.online?'linear-gradient(90deg,#34d399,#38bdf8)':'linear-gradient(90deg,#fb7185,#f97316)',opacity:0.6}} />
 
                   {/* Header row */}
                   <div style={{padding:'18px 20px 14px',borderBottom:'1px solid var(--b1)',display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:12}}>
@@ -1612,8 +1683,11 @@ function NodesPage({ nodes, onReload, onManage, onOpenNode }) {
               const active  = s.containers||0;
               const stopped = total - active;
               return (
-                <div className="card" key={node.id} style={{padding:0,overflow:'hidden',cursor:'pointer'}}
-                  onClick={()=>onOpenNode(node)}>
+                <div className="card" key={node.id} style={{padding:0,overflow:'hidden',cursor:'pointer',transition:'border-color .15s, transform .15s, box-shadow .15s'}}
+                  onClick={()=>onOpenNode(node)}
+                  onMouseEnter={e=>{ e.currentTarget.style.borderColor='rgba(124,111,247,0.25)'; e.currentTarget.style.transform='translateY(-2px)'; e.currentTarget.style.boxShadow='0 8px 32px rgba(0,0,0,0.2)'; }}
+                  onMouseLeave={e=>{ e.currentTarget.style.borderColor=''; e.currentTarget.style.transform=''; e.currentTarget.style.boxShadow=''; }}>
+                  <div style={{height:2,background:s.online?'linear-gradient(90deg,#34d399,#38bdf8)':'linear-gradient(90deg,#fb7185,#f97316)',opacity:0.6}} />
                   <div style={{padding:'18px 20px 14px',borderBottom:'1px solid var(--b1)',display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:12}}>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:5}}>
@@ -3265,13 +3339,12 @@ function DatabaseManager() {
   const [optimizing, setOptimizing] = useState(false);
   const [cleaning, setCleaning] = useState(false);
   const [result, setResult] = useState(null);
-  const toasts = useToast();
 
   const loadStats = async () => {
     try {
       const data = await api('GET', '/api/db/stats');
       setStats(data);
-    } catch(e) { toasts.error(e.message); }
+    } catch(e) { toast(e.message, 'error'); }
     finally { setLoading(false); }
   };
 
@@ -3282,9 +3355,9 @@ function DatabaseManager() {
     try {
       const data = await api('POST', '/api/db/optimize');
       setResult(data);
-      toasts.ok('База данных оптимизирована');
+      toast('База данных оптимизирована', 'success');
       loadStats();
-    } catch(e) { toasts.error(e.message); }
+    } catch(e) { toast(e.message, 'error'); }
     finally { setOptimizing(false); }
   };
 
@@ -3293,9 +3366,9 @@ function DatabaseManager() {
     try {
       const data = await api('POST', '/api/db/cleanup');
       setResult(data);
-      toasts.ok('Очистка завершена');
+      toast('Очистка завершена', 'success');
       loadStats();
-    } catch(e) { toasts.error(e.message); }
+    } catch(e) { toast(e.message, 'error'); }
     finally { setCleaning(false); }
   };
 
@@ -3308,50 +3381,69 @@ function DatabaseManager() {
   if (loading) return <div className="section-card" style={{textAlign:'center',padding:40}}>Загрузка...</div>;
 
   return (
-    <div>
-      <div className="section-header"><I.Database/> База данных</div>
+    <div className="pg">
+      <div className="topbar">
+        <div className="topbar-left">
+          <div className="page-title"><em>База данных</em></div>
+          <div className="page-desc">SQLite • управление и оптимизация</div>
+        </div>
+        <div className="topbar-right">
+          <button className="btn btn-ghost btn-sm" onClick={()=>{setLoading(true);loadStats();}}><I.RefreshCw/> Обновить</button>
+        </div>
+      </div>
 
       {/* DB Size */}
       {stats && (
-        <div className="section-card" style={{marginBottom:16}}>
-          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16}}>
-            <div>
-              <div style={{fontSize:14,fontWeight:600}}>Размер базы данных</div>
-              <div style={{fontSize:28,fontWeight:800,color:'var(--primary)',marginTop:4}}>{fmtSize(stats.size_bytes)}</div>
-            </div>
-            <div style={{fontSize:12,color:'var(--t3)'}}>SQLite</div>
-          </div>
-
-          <div style={{fontSize:13,fontWeight:600,marginBottom:8}}>Таблицы</div>
-          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(180px,1fr))',gap:8}}>
-            {stats.tables.map(t => (
-              <div key={t.name} style={{background:'var(--bg2)',borderRadius:8,padding:'10px 14px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                <span style={{fontSize:12,color:'var(--t2)'}}>{t.name}</span>
-                <span style={{fontSize:13,fontWeight:700}}>{t.count}</span>
+        <div className="section-card" style={{marginBottom:16,overflow:'hidden',padding:0}}>
+          <div style={{height:2,background:'linear-gradient(90deg, #7c6ff7, #38bdf8)',opacity:0.6}} />
+          <div style={{padding:20}}>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16}}>
+              <div>
+                <div style={{fontSize:14,fontWeight:600,display:'flex',alignItems:'center',gap:8}}><I.Database/> Размер базы данных</div>
+                <div style={{fontSize:28,fontWeight:800,color:'var(--primary)',marginTop:4,fontFamily:'var(--mono)',letterSpacing:'-1px'}}>{fmtSize(stats.size_bytes)}</div>
               </div>
-            ))}
+              <span className="badge badge-purple" style={{fontSize:11}}>SQLite</span>
+            </div>
+
+            <div style={{fontSize:13,fontWeight:600,marginBottom:8}}>Таблицы</div>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(180px,1fr))',gap:8}}>
+              {stats.tables.map(t => (
+                <div key={t.name} style={{background:'var(--bg2)',borderRadius:8,padding:'10px 14px',display:'flex',justifyContent:'space-between',alignItems:'center',border:'1px solid var(--b1)',transition:'border-color .15s'}}
+                  onMouseEnter={e=>e.currentTarget.style.borderColor='var(--b2)'}
+                  onMouseLeave={e=>e.currentTarget.style.borderColor='var(--b1)'}>
+                  <span style={{fontSize:12,color:'var(--t2)',fontFamily:'var(--mono)'}}>{t.name}</span>
+                  <span style={{fontSize:13,fontWeight:700,color:'var(--vi)'}}>{t.count}</span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}
 
       {/* Actions */}
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:16}}>
-        <div className="section-card">
-          <div style={{fontSize:14,fontWeight:600,marginBottom:8}}>Оптимизация</div>
-          <p style={{fontSize:12,color:'var(--t3)',marginBottom:12}}>
+        <div className="section-card" style={{display:'flex',flexDirection:'column'}}>
+          <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
+            <div style={{width:28,height:28,borderRadius:7,background:'rgba(124,111,247,0.12)',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--vi)',flexShrink:0}}><I.RefreshCw/></div>
+            <span style={{fontSize:14,fontWeight:600}}>Оптимизация</span>
+          </div>
+          <p style={{fontSize:12,color:'var(--t3)',marginBottom:12,flex:1}}>
             Выполняет VACUUM и ANALYZE для оптимизации размера и производительности. Также проверяет целостность базы.
           </p>
-          <button className="btn btn-primary" onClick={handleOptimize} disabled={optimizing} style={{width:'100%'}}>
+          <button className="btn btn-primary" onClick={handleOptimize} disabled={optimizing} style={{width:'100%',justifyContent:'center'}}>
             {optimizing ? <>⏳ Оптимизация...</> : <><I.RefreshCw/> Оптимизировать</>}
           </button>
         </div>
 
-        <div className="section-card">
-          <div style={{fontSize:14,fontWeight:600,marginBottom:8}}>Очистка</div>
-          <p style={{fontSize:12,color:'var(--t3)',marginBottom:12}}>
+        <div className="section-card" style={{display:'flex',flexDirection:'column'}}>
+          <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
+            <div style={{width:28,height:28,borderRadius:7,background:'rgba(251,191,36,0.12)',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--am)',flexShrink:0}}><I.Trash/></div>
+            <span style={{fontSize:14,fontWeight:600}}>Очистка</span>
+          </div>
+          <p style={{fontSize:12,color:'var(--t3)',marginBottom:12,flex:1}}>
             Удаляет истёкшие сессии, историю подключений старше 30 дней и устаревшие данные.
           </p>
-          <button className="btn btn-warning" onClick={handleCleanup} disabled={cleaning} style={{width:'100%'}}>
+          <button className="btn btn-warning" onClick={handleCleanup} disabled={cleaning} style={{width:'100%',justifyContent:'center'}}>
             {cleaning ? <>⏳ Очистка...</> : <><I.Trash/> Очистить</>}
           </button>
         </div>
@@ -3377,13 +3469,12 @@ function AnnouncementsManager() {
   const [editing, setEditing] = useState(null); // null | 'new' | announcement object
   const [form, setForm] = useState({ title: '', message: '', type: 'info' });
   const [saving, setSaving] = useState(false);
-  const toasts = useToast();
 
   const load = async () => {
     try {
       const data = await api('GET', '/api/announcements');
       setItems(data);
-    } catch(e) { toasts.error(e.message); }
+    } catch(e) { toast(e.message, 'error'); }
     finally { setLoading(false); }
   };
 
@@ -3400,19 +3491,19 @@ function AnnouncementsManager() {
   };
 
   const handleSave = async () => {
-    if (!form.title.trim() || !form.message.trim()) { toasts.error('Заполните все поля'); return; }
+    if (!form.title.trim() || !form.message.trim()) { toast('Заполните все поля', 'error'); return; }
     setSaving(true);
     try {
       if (editing === 'new') {
         await api('POST', '/api/announcements', form);
-        toasts.ok('Уведомление создано');
+        toast('Уведомление создано', 'success');
       } else {
         await api('PUT', `/api/announcements/${editing.id}`, form);
-        toasts.ok('Уведомление обновлено');
+        toast('Уведомление обновлено', 'success');
       }
       setEditing(null);
       load();
-    } catch(e) { toasts.error(e.message); }
+    } catch(e) { toast(e.message, 'error'); }
     finally { setSaving(false); }
   };
 
@@ -3420,16 +3511,16 @@ function AnnouncementsManager() {
     try {
       await api('PUT', `/api/announcements/${a.id}`, { title: a.title, message: a.message, type: a.type, is_active: a.is_active ? 0 : 1 });
       load();
-    } catch(e) { toasts.error(e.message); }
+    } catch(e) { toast(e.message, 'error'); }
   };
 
   const handleDelete = async (a) => {
     if (!confirm('Удалить уведомление?')) return;
     try {
       await api('DELETE', `/api/announcements/${a.id}`);
-      toasts.ok('Удалено');
+      toast('Удалено', 'success');
       load();
-    } catch(e) { toasts.error(e.message); }
+    } catch(e) { toast(e.message, 'error'); }
   };
 
   const typeLabels = { info: '💡 Инфо', warning: '⚠️ Важно', success: '✅ Успех', danger: '🔴 Срочно' };
@@ -3439,10 +3530,15 @@ function AnnouncementsManager() {
   if (loading) return <div className="section-card" style={{textAlign:'center',padding:40}}>Загрузка...</div>;
 
   return (
-    <div>
-      <div className="section-header" style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-        <span><I.Bell/> Уведомления для клиентов</span>
-        <button className="btn btn-primary btn-sm" onClick={handleNew}><I.Plus/> Создать</button>
+    <div className="pg">
+      <div className="topbar">
+        <div className="topbar-left">
+          <div className="page-title"><em>Уведомления</em></div>
+          <div className="page-desc">Управление баннерами для клиентов</div>
+        </div>
+        <div className="topbar-right">
+          <button className="btn btn-primary btn-sm" onClick={handleNew}><I.Plus/> Создать</button>
+        </div>
       </div>
 
       {/* Edit Form */}
@@ -3452,9 +3548,9 @@ function AnnouncementsManager() {
             {editing === 'new' ? 'Новое уведомление' : 'Редактирование'}
           </div>
           <div style={{display:'grid',gap:10}}>
-            <input className="input" placeholder="Заголовок" value={form.title}
+            <input className="form-input" placeholder="Заголовок" value={form.title}
               onChange={e => setForm({...form, title: e.target.value})} />
-            <textarea className="input" placeholder="Сообщение" rows={3} value={form.message}
+            <textarea className="form-input" placeholder="Сообщение" rows={3} value={form.message}
               onChange={e => setForm({...form, message: e.target.value})} style={{resize:'vertical'}} />
             <div style={{display:'flex',gap:8}}>
               {Object.entries(typeLabels).map(([k,v]) => (
@@ -3482,8 +3578,8 @@ function AnnouncementsManager() {
       ) : (
         <div style={{display:'grid',gap:8}}>
           {items.map(a => (
-            <div key={a.id} className="section-card" style={{display:'flex',alignItems:'center',gap:12,opacity: a.is_active ? 1 : 0.5}}>
-              <div style={{width:4,height:40,borderRadius:4,background:typeColors[a.type]||typeColors.info,flexShrink:0}} />
+            <div key={a.id} className="section-card" style={{display:'flex',alignItems:'center',gap:12,opacity: a.is_active ? 1 : 0.5,transition:'opacity .15s, border-color .15s'}}>
+              <div style={{width:4,height:40,borderRadius:4,background:typeColors[a.type]||typeColors.info,flexShrink:0,boxShadow:`0 0 8px ${typeColors[a.type]||typeColors.info}44`}} />
               <div style={{flex:1,minWidth:0}}>
                 <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:2}}>
                   <span style={{fontSize:13,fontWeight:600}}>{a.title}</span>
@@ -3517,13 +3613,12 @@ function BackupsManager() {
   const [restoring, setRestoring] = useState(false);
   const [deleting, setDeleting] = useState(null);
   const [confirm, setConfirm] = useState(null);
-  const toasts = useToast();
 
   const load = async () => {
     try {
       const d = await api('GET', '/api/backups');
       setData(d);
-    } catch(e) { toasts.error(e.message); }
+    } catch(e) { toast(e.message, 'error'); }
     finally { setLoading(false); }
   };
   useEffect(() => { load(); }, []);
@@ -3543,9 +3638,9 @@ function BackupsManager() {
     setCreating(true);
     try {
       await api('POST', '/api/backups/create');
-      toasts.ok('Бекап создан');
+      toast('Бекап создан', 'success');
       load();
-    } catch(e) { toasts.error(e.message); }
+    } catch(e) { toast(e.message, 'error'); }
     finally { setCreating(false); }
   };
 
@@ -3553,9 +3648,9 @@ function BackupsManager() {
     setDeleting(name);
     try {
       await api('DELETE', `/api/backups/${encodeURIComponent(name)}`);
-      toasts.ok('Бекап удалён');
+      toast('Бекап удалён', 'success');
       load();
-    } catch(e) { toasts.error(e.message); }
+    } catch(e) { toast(e.message, 'error'); }
     finally { setDeleting(null); setConfirm(null); }
   };
 
@@ -3572,14 +3667,14 @@ function BackupsManager() {
         a.click();
         URL.revokeObjectURL(url);
       })
-      .catch(e => toasts.error('Ошибка скачивания: ' + e.message));
+      .catch(e => toast('Ошибка скачивания: ' + e.message, 'error'));
   };
 
   const handleRestore = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
     if (!file.name.endsWith('.tar.gz')) {
-      toasts.error('Нужен .tar.gz файл');
+      toast('Нужен .tar.gz файл', 'error');
       return;
     }
     if (!window.confirm('Восстановить панель из бекапа? Текущие данные будут перезаписаны. Автоматический бекап текущего состояния будет создан перед восстановлением.')) {
@@ -3597,18 +3692,18 @@ function BackupsManager() {
       });
       const result = await resp.json();
       if (!resp.ok) throw new Error(result.error || 'Ошибка');
-      toasts.ok(result.message || 'Восстановлено');
+      toast(result.message || 'Восстановлено', 'success');
       setTimeout(() => window.location.reload(), 3000);
-    } catch(e) { toasts.error(e.message); }
+    } catch(e) { toast(e.message, 'error'); }
     finally { setRestoring(false); e.target.value = ''; }
   };
 
   const handleAutoBackup = async (interval) => {
     try {
       await api('PUT', '/api/backups/auto', { interval });
-      toasts.ok('Авто-бекап: ' + (interval === 'off' ? 'выключен' : interval));
+      toast('Авто-бекап: ' + (interval === 'off' ? 'выключен' : interval), 'success');
       load();
-    } catch(e) { toasts.error(e.message); }
+    } catch(e) { toast(e.message, 'error'); }
   };
 
   if (loading) return <div className="section-card" style={{textAlign:'center',padding:40}}>Загрузка...</div>;
@@ -3617,16 +3712,22 @@ function BackupsManager() {
   const lastBackup = data?.autoBackup?.lastBackup;
 
   return (
-    <div>
-      <div className="section-header"><I.HardDrive/> Бекапы</div>
+    <div className="pg">
+      <div className="topbar">
+        <div className="topbar-left">
+          <div className="page-title"><em>Бекапы</em></div>
+          <div className="page-desc">Резервное копирование и восстановление</div>
+        </div>
+        <div className="topbar-right">
+          <button className="btn btn-primary btn-sm" onClick={handleCreate} disabled={creating}>
+            {creating ? <span className="spin spin-sm"/> : <I.Save/>} Создать бекап
+          </button>
+        </div>
+      </div>
 
       {/* Actions */}
       <div className="section-card" style={{marginBottom:16}}>
         <div style={{display:'flex',gap:12,flexWrap:'wrap',alignItems:'center'}}>
-          <button className="btn btn-primary" onClick={handleCreate} disabled={creating}>
-            {creating ? <span className="spin spin-sm"/> : <I.Save/>} Создать бекап
-          </button>
-
           <label className="btn btn-ghost" style={{cursor: restoring ? 'wait' : 'pointer', position:'relative'}}>
             {restoring ? <span className="spin spin-sm"/> : <I.Upload/>} Восстановить из файла
             <input type="file" accept=".tar.gz,.gz" style={{position:'absolute',opacity:0,width:0,height:0}} onChange={handleRestore} disabled={restoring}/>
@@ -3647,9 +3748,12 @@ function BackupsManager() {
       </div>
 
       {/* Info */}
-      <div className="section-card" style={{marginBottom:16, padding:'12px 16px', background:'rgba(59,130,246,0.08)', borderRadius:8, fontSize:13, color:'var(--t2)'}}>
-        <strong>Что включено в бекап:</strong> База данных, настройки (.env), SSH ключи, версия панели, метаданные.
-        <br/>Для миграции на другой VPS: скачайте бекап → установите панель на новом сервере → загрузите бекап через «Восстановить из файла».
+      <div className="section-card" style={{marginBottom:16, padding:0, overflow:'hidden', borderRadius:10}}>
+        <div style={{height:2,background:'linear-gradient(90deg, #3b82f6, #38bdf8)',opacity:0.5}} />
+        <div style={{padding:'12px 16px', fontSize:13, color:'var(--t2)'}}>
+          <strong style={{color:'var(--t1)'}}>Что включено в бекап:</strong> База данных, настройки (.env), SSH ключи, версия панели, метаданные.
+          <br/>Для миграции на другой VPS: скачайте бекап → установите панель на новом сервере → загрузите бекап через «Восстановить из файла».
+        </div>
       </div>
 
       {/* Backups list */}
@@ -3661,10 +3765,13 @@ function BackupsManager() {
         ) : (
           <div style={{display:'flex',flexDirection:'column',gap:8}}>
             {data.backups.map(b => (
-              <div key={b.name} style={{display:'flex',alignItems:'center',gap:12,padding:'10px 14px',background:'var(--bg2)',borderRadius:8,flexWrap:'wrap'}}>
+              <div key={b.name} style={{display:'flex',alignItems:'center',gap:12,padding:'10px 14px',background:'var(--bg2)',borderRadius:8,flexWrap:'wrap',border:'1px solid var(--b1)',transition:'border-color .15s'}}
+                onMouseEnter={e=>e.currentTarget.style.borderColor='var(--b2)'}
+                onMouseLeave={e=>e.currentTarget.style.borderColor='var(--b1)'}>
+                <div style={{width:32,height:32,borderRadius:8,background:'rgba(124,111,247,0.1)',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--vi)',flexShrink:0}}><I.FileText/></div>
                 <div style={{flex:1,minWidth:200}}>
                   <div style={{fontSize:13,fontWeight:600,wordBreak:'break-all'}}>{b.name}</div>
-                  <div style={{fontSize:12,color:'var(--t3)'}}>{fmtDate(b.created)} · {fmtSize(b.size)}</div>
+                  <div style={{fontSize:12,color:'var(--t3)',fontFamily:'var(--mono)'}}>{fmtDate(b.created)} · {fmtSize(b.size)}</div>
                 </div>
                 <div style={{display:'flex',gap:6}}>
                   <button className="btn btn-ghost btn-sm" onClick={() => handleDownload(b.name)} title="Скачать">
@@ -3702,6 +3809,7 @@ function App() {
   const [selNodeView, setSelNodeView] = useState(null); // for node detail page
   const [panelVersion, setPanelVersion] = useState(null);
   const [panelCommit, setPanelCommit] = useState(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const toasts = useToast();
 
   const loadNodes = useCallback(async () => {
@@ -3737,7 +3845,7 @@ function App() {
   useEffect(()=>{ if(authed) loadNodes(); },[authed]);
   useEffect(()=>{ if(nodes.length&&!nodes[0]._userCount) loadCounts(nodes); },[nodes]);
 
-  const nav = (p) => { setPage(p); setSelNode(null); setSelNodeView(null); };
+  const nav = (p) => { setPage(p); setSelNode(null); setSelNodeView(null); setSidebarOpen(false); };
   const selectNode = (n) => { setSelNode(n); setPage('users'); };
   const openNodeView = (n) => { setSelNodeView(n); setPage('node'); };
 
@@ -3759,7 +3867,11 @@ function App() {
 
   return (
     <div className="app">
-      <aside className="sidebar" id="sidebar">
+      <button className="mobile-toggle" onClick={() => setSidebarOpen(!sidebarOpen)}>
+        {sidebarOpen ? <I.X/> : <I.Menu/>}
+      </button>
+      {sidebarOpen && <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)}/>}
+      <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`} id="sidebar">
         <div className="sidebar-logo">
           <div className="logo-icon"><I.Zap/></div>
           <div className="logo-texts">
