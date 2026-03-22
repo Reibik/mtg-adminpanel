@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Zap, Shield, Gauge, Globe, ChevronDown, ArrowRight, Info, AlertTriangle, CheckCircle, Megaphone, X, LayoutDashboard } from 'lucide-react';
+import { Zap, Shield, Gauge, Globe, ChevronDown, ArrowRight, Info, AlertTriangle, CheckCircle, Megaphone, X, LayoutDashboard, Gift } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { catalogApi } from '../api/client';
 import { useAuthStore } from '../store/auth';
@@ -150,6 +150,44 @@ export default function Landing() {
                 <p className="text-sm text-gray-400">{f.desc}</p>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* VPN Bonus */}
+      <section className="py-20 px-4">
+        <div className="max-w-4xl mx-auto">
+          <div className="relative overflow-hidden rounded-3xl border border-emerald-500/20 bg-gradient-to-br from-emerald-500/10 via-surface to-primary/5 p-8 md:p-12">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl" />
+            <div className="relative flex flex-col md:flex-row items-center gap-8">
+              <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-emerald-500/30 to-emerald-600/20 flex items-center justify-center shrink-0">
+                <Gift size={40} className="text-emerald-400" />
+              </div>
+              <div className="flex-1 text-center md:text-left">
+                <h2 className="text-2xl md:text-3xl font-extrabold mb-3">
+                  Подписчики <span className="text-emerald-400">VPN ST VILLAGE</span> — прокси бесплатно!
+                </h2>
+                <p className="text-gray-400 mb-4 max-w-xl">
+                  Если у вас уже есть активная подписка на VPN ST VILLAGE, вы получаете бесплатный Telegram-прокси на весь срок действия VPN. Никаких доплат — просто активируйте в личном кабинете.
+                </p>
+                <div className="flex flex-wrap gap-4 justify-center md:justify-start text-sm">
+                  <div className="flex items-center gap-2 text-emerald-400">
+                    <CheckCircle size={16} /> <span>Бесплатно для подписчиков VPN</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-emerald-400">
+                    <CheckCircle size={16} /> <span>Активация в 1 клик</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-emerald-400">
+                    <CheckCircle size={16} /> <span>Действует пока активна VPN</span>
+                  </div>
+                </div>
+                <div className="mt-6">
+                  <Link to={isAuthenticated ? '/plans' : '/register'} className="inline-flex items-center gap-2 px-6 py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 transition text-sm">
+                    {isAuthenticated ? 'Активировать в кабинете' : 'Зарегистрироваться и получить'} <ArrowRight size={16} />
+                  </Link>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>

@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { ordersApi, proxiesApi, paymentsApi, profileApi, balanceApi } from '../api/client';
-import { Wifi, CreditCard, Activity, ArrowRight, Globe, Clock, Shield, BarChart3, Zap, TrendingUp, CalendarDays, RefreshCw, Wallet, Plus, X } from 'lucide-react';
+import { ordersApi, proxiesApi, paymentsApi, profileApi, balanceApi, vpnApi } from '../api/client';
+import { Wifi, CreditCard, Activity, ArrowRight, Globe, Clock, Shield, BarChart3, Zap, TrendingUp, CalendarDays, RefreshCw, Wallet, Plus, X, Gift } from 'lucide-react';
 import Spinner from '../components/ui/Spinner';
 import { useToast } from '../components/ui/Toast';
 import {
@@ -25,6 +25,7 @@ export default function Dashboard() {
   const [showTopup, setShowTopup] = useState(false);
   const [topupAmount, setTopupAmount] = useState('');
   const [topupLoading, setTopupLoading] = useState(false);
+  const [vpnStatus, setVpnStatus] = useState(null);
   const intervalRef = useRef(null);
   const toast = useToast();
 
@@ -127,6 +128,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchData();
+    vpnApi.status().then(r => setVpnStatus(r.data || null)).catch(() => {});
     intervalRef.current = setInterval(() => fetchData(true), 30000);
     return () => clearInterval(intervalRef.current);
   }, [fetchData]);
@@ -240,6 +242,62 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {/* VPN Free Proxy Block */}
+      {vpnStatus?.enabled && (
+        vpnStatus.hasVpn ? (
+          vpnStatus.hasFreeProxy ? (
+            <div className="card border border-emerald-500/20 bg-emerald-500/5">
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center shrink-0">
+                  <Gift size={20} className="text-emerald-400" />
+                </div>
+                <div className="flex-1">
+                  <p className="font-semibold text-emerald-400">Бесплатный прокси по VPN активен</p>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Действует пока активна подписка VPN ST VILLAGE
+                    {vpnStatus.vpnExpiresAt && ` · до ${new Date(vpnStatus.vpnExpiresAt).toLocaleDateString('ru-RU')}`}
+                  </p>
+                </div>
+                <Link to="/proxies" className="btn-secondary btn-sm flex items-center gap-1.5 shrink-0">
+                  Перейти <ArrowRight size={14} />
+                </Link>
+              </div>
+            </div>
+          ) : (
+            <div className="card border border-emerald-500/30 bg-gradient-to-r from-emerald-500/10 to-emerald-600/5">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-emerald-500/20 flex items-center justify-center shrink-0">
+                  <Gift size={24} className="text-emerald-400" />
+                </div>
+                <div className="flex-1">
+                  <p className="font-bold text-emerald-400">У вас есть бесплатный прокси!</p>
+                  <p className="text-sm text-gray-400 mt-0.5">Ваша VPN ST VILLAGE подписка даёт бесплатный Telegram-прокси. Активируйте его прямо сейчас.</p>
+                </div>
+                <Link to="/plans" className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-white bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 transition text-sm shrink-0">
+                  <Gift size={14} /> Получить
+                </Link>
+              </div>
+            </div>
+          )
+        ) : (
+          <div className="card border border-white/5 bg-gradient-to-r from-primary/5 to-accent/5">
+            <div className="flex items-center gap-4">
+              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                <Gift size={20} className="text-primary" />
+              </div>
+              <div className="flex-1">
+                <p className="font-semibold">Бесплатный прокси для подписчиков VPN</p>
+                <p className="text-xs text-gray-500 mt-0.5">Оформите подписку на VPN ST VILLAGE и получите бесплатный Telegram-прокси</p>
+              </div>
+              <a href="https://t.me/bedolaga_bot" target="_blank" rel="noopener noreferrer"
+                className="btn-secondary btn-sm flex items-center gap-1.5 shrink-0">
+                Подробнее <ArrowRight size={14} />
+              </a>
+            </div>
+          </div>
+        )
+      )}
 
       {/* Topup modal */}
       {showTopup && (

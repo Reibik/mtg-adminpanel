@@ -60,6 +60,22 @@ router.delete('/plans/:id', (req, res) => {
   res.json({ ok: true });
 });
 
+// VPN free plan setting
+router.get('/vpn-free-plan', (req, res) => {
+  const row = db.prepare("SELECT value FROM settings WHERE key = 'vpn_free_plan_id'").get();
+  res.json({ plan_id: row ? Number(row.value) : null });
+});
+
+router.post('/vpn-free-plan', (req, res) => {
+  const { plan_id } = req.body;
+  if (plan_id === null || plan_id === undefined) {
+    db.prepare("DELETE FROM settings WHERE key = 'vpn_free_plan_id'").run();
+  } else {
+    db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('vpn_free_plan_id', ?)").run(String(plan_id));
+  }
+  res.json({ ok: true });
+});
+
 // ═══════════════════════════════════════════════════════════
 // CHANGELOG MANAGEMENT
 // ═══════════════════════════════════════════════════════════

@@ -15,8 +15,14 @@ const { URL } = require('url');
 const API_URL = () => process.env.REMNAWAVE_API_URL || '';
 const API_TOKEN = () => process.env.REMNAWAVE_API_TOKEN || '';
 const FREE_PLAN_ID = () => {
+  // Check env var first, then DB setting
   const v = process.env.VPN_FREE_PLAN_ID;
-  return v ? Number(v) : null;
+  if (v) return Number(v);
+  try {
+    const db = require('./db');
+    const row = db.prepare("SELECT value FROM settings WHERE key = 'vpn_free_plan_id'").get();
+    return row ? Number(row.value) : null;
+  } catch { return null; }
 };
 
 function isEnabled() {
