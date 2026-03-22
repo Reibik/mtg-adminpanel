@@ -290,7 +290,7 @@ export default function Dashboard() {
                 <p className="font-semibold">Бесплатный прокси для подписчиков VPN</p>
                 <p className="text-xs text-gray-500 mt-0.5">Оформите подписку на VPN ST VILLAGE и получите бесплатный Telegram-прокси</p>
               </div>
-              <a href="https://t.me/bedolaga_bot" target="_blank" rel="noopener noreferrer"
+              <a href="https://cabinet.st-villagevpn.ru/" target="_blank" rel="noopener noreferrer"
                 className="btn-secondary btn-sm flex items-center gap-1.5 shrink-0">
                 Подробнее <ArrowRight size={14} />
               </a>

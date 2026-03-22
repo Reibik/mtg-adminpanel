@@ -161,12 +161,18 @@ export default function Plans() {
         {plans.map((p, i) => {
           const isPopular = i === 1;
           const isSelected = selectedPlan?.id === p.id;
+          const isVpnPlan = vpnStatus?.freePlanId && vpnStatus.freePlanId === p.id;
           return (
             <button key={p.id}
               onClick={() => setSelectedPlan(p)}
-              className={`card text-left transition relative ${isSelected ? 'ring-2 ring-primary' : 'hover:ring-1 hover:ring-gray-600'}`}
+              className={`card text-left transition relative ${isSelected ? 'ring-2 ring-primary' : isVpnPlan ? 'ring-1 ring-emerald-500/30 hover:ring-emerald-500/50' : 'hover:ring-1 hover:ring-gray-600'}`}
             >
-              {isPopular && (
+              {isVpnPlan && (
+                <span className="absolute -top-2 left-4 flex items-center gap-1 text-xs font-bold px-3 py-0.5 rounded-full bg-gradient-to-r from-emerald-600 to-emerald-500 text-white">
+                  <Gift size={10} /> VPN Бонус
+                </span>
+              )}
+              {isPopular && !isVpnPlan && (
                 <span className="absolute -top-2 right-4 badge-warning flex items-center gap-1 text-xs">
                   <Star size={10} /> Популярный
                 </span>
