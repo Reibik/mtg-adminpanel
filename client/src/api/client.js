@@ -98,6 +98,12 @@ export const ordersApi = {
   remove: (id) => api.delete(`/orders/${id}`),
   payWithBalance: (id) => api.post(`/orders/${id}/pay-balance`),
   renew: (id) => api.post(`/orders/${id}/renew`),
+  createFreeVpn: (data) => api.post('/orders/free-vpn', data),
+};
+
+// ── VPN Status ────────────────────────────────────────────
+export const vpnApi = {
+  status: () => api.get('/vpn-status'),
 };
 
 // ── Proxies ───────────────────────────────────────────────

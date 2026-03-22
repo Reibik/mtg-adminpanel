@@ -11,7 +11,7 @@ import {
 import { Line } from 'react-chartjs-2';
 import {
   ArrowLeft, Copy, QrCode, Wifi, Clock,
-  Users, ToggleLeft, ToggleRight, Download, Upload, Signal, RefreshCw
+  Users, ToggleLeft, ToggleRight, Download, Upload, Signal, RefreshCw, Gift
 } from 'lucide-react';
 import Spinner from '../components/ui/Spinner';
 
@@ -71,6 +71,7 @@ export default function ProxyDetail() {
   const tgLink = proxy?.link || null;
   const expires = order.expires_at ? new Date(order.expires_at) : null;
   const daysLeft = expires ? Math.ceil((expires - Date.now()) / 86400000) : 0;
+  const isVpnFree = !!order.is_vpn_free;
 
   // Chart data from connection history
   const chartData = history.length > 0 ? {
@@ -105,6 +106,9 @@ export default function ProxyDetail() {
           <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-2">
             <span className="text-xl sm:text-2xl">{order.node_flag || '🌐'}</span>
             <span className="truncate">{order.plan_name || `Заказ #${order.id}`}</span>
+            {isVpnFree && (
+              <span className="text-xs px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-400 font-medium shrink-0">VPN Бонус</span>
+            )}
           </h1>
           <p className="text-sm text-gray-400">ID: {order.id}</p>
         </div>
@@ -197,7 +201,7 @@ export default function ProxyDetail() {
       )}
 
       {/* Renew subscription */}
-      {order.status === 'active' && (
+      {order.status === 'active' && !isVpnFree && (
         <div className="card">
           <div className="flex items-center justify-between">
             <div>
@@ -223,7 +227,21 @@ export default function ProxyDetail() {
         </div>
       )}
 
+      {/* VPN free proxy info */}
+      {isVpnFree && (
+        <div className="card border border-emerald-500/20 bg-emerald-500/5">
+          <div className="flex items-center gap-3">
+            <Gift size={18} className="text-emerald-400 shrink-0" />
+            <div>
+              <p className="font-semibold text-emerald-400 text-sm">Бесплатный прокси по VPN ST VILLAGE</p>
+              <p className="text-xs text-gray-400 mt-0.5">Действует пока активна ваша VPN-подписка. Продление автоматическое.</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Auto-renew */}
+      {!isVpnFree && (
       <div className="card flex items-center justify-between">
         <div>
           <h3 className="font-semibold">Автопродление</h3>
@@ -240,6 +258,7 @@ export default function ProxyDetail() {
           )}
         </button>
       </div>
+      )}
     </div>
   );
 }

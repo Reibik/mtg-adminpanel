@@ -78,6 +78,7 @@ export default function Proxies() {
     const isActive = item.status === 'active';
     const expires = item.expires_at ? new Date(item.expires_at) : null;
     const daysLeft = expires ? Math.ceil((expires - Date.now()) / 86400000) : 0;
+    const isVpnFree = !!item.is_vpn_free;
 
     return (
       <div className="card-hover group block relative">
@@ -86,6 +87,9 @@ export default function Proxies() {
             <div className="flex items-center gap-2">
               <span className="text-xl">{item.node_flag || <Globe size={18} />}</span>
               <span className="font-semibold">{item.plan_name || `Заказ #${item.id}`}</span>
+              {isVpnFree && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-emerald-500/20 text-emerald-400 font-medium">VPN Бонус</span>
+              )}
             </div>
             {isActive
               ? <span className="badge-success flex items-center gap-1"><Wifi size={10} /> Активен</span>
@@ -108,7 +112,7 @@ export default function Proxies() {
             </div>
           )}
 
-          {isActive && (
+          {isActive && !isVpnFree && (
             <div className="mt-3 flex items-center gap-2" onClick={e => e.preventDefault()}>
               <button
                 onClick={(e) => { e.stopPropagation(); handleRenew(item.id); }}
@@ -118,6 +122,10 @@ export default function Proxies() {
                 {renewing === item.id ? <Spinner size="sm" /> : <><RefreshCw size={12} /> Продлить</>}
               </button>
             </div>
+          )}
+
+          {isActive && isVpnFree && (
+            <p className="mt-3 text-xs text-emerald-400/70">Действует пока активна VPN подписка</p>
           )}
 
           {!isActive && (

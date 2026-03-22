@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { catalogApi, ordersApi, paymentsApi, balanceApi } from '../api/client';
+import { catalogApi, ordersApi, paymentsApi, balanceApi, vpnApi } from '../api/client';
 import { useToast } from '../components/ui/Toast';
-import { Zap, Globe, Check, Star, ShieldCheck, X, Wallet, CreditCard } from 'lucide-react';
+import { Zap, Globe, Check, Star, ShieldCheck, X, Wallet, CreditCard, Gift } from 'lucide-react';
 import Spinner from '../components/ui/Spinner';
 
 export default function Plans() {
@@ -15,6 +15,9 @@ export default function Plans() {
   const [ordering, setOrdering] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [balance, setBalance] = useState(0);
+  const [vpnStatus, setVpnStatus] = useState(null);
+  const [vpnOrdering, setVpnOrdering] = useState(false);
+  const [vpnLocFlag, setVpnLocFlag] = useState('');
   const toast = useToast();
   const navigate = useNavigate();
 
@@ -23,10 +26,12 @@ export default function Plans() {
       catalogApi.plans(),
       catalogApi.locations(),
       balanceApi.get().catch(() => ({ data: { balance: 0 } })),
-    ]).then(([p, l, b]) => {
+      vpnApi.status().catch(() => ({ data: null })),
+    ]).then(([p, l, b, v]) => {
       setPlans(p.data || []);
       setLocations(l.data || []);
       setBalance(b.data?.balance || 0);
+      setVpnStatus(v.data || null);
     }).catch(() => {
       setError('Не удалось загрузить тарифы');
     }).finally(() => setLoading(false));
@@ -70,6 +75,17 @@ export default function Plans() {
     } finally { setOrdering(false); }
   };
 
+  const handleFreeVpnOrder = async () => {
+    setVpnOrdering(true);
+    try {
+      await ordersApi.createFreeVpn({ location_flag: vpnLocFlag || undefined });
+      toast.success('Бесплатный прокси активирован!');
+      navigate('/proxies');
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Ошибка при создании бесплатного прокси');
+    } finally { setVpnOrdering(false); }
+  };
+
   if (loading) return <div className="flex justify-center py-20"><Spinner size="lg" /></div>;
 
   if (error) return (
@@ -86,6 +102,59 @@ export default function Plans() {
         <h1 className="text-2xl font-bold">Тарифы</h1>
         <p className="text-gray-400 text-sm mt-1">Выберите подходящий тариф и локацию</p>
       </div>
+
+      {/* VPN ST VILLAGE free proxy banner */}
+      {vpnStatus?.enabled && vpnStatus.hasVpn && !vpnStatus.hasFreeProxy && (
+        <div className="card border border-emerald-500/30 bg-emerald-500/5">
+          <div className="flex items-start gap-4">
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center shrink-0">
+              <Gift size={20} className="text-emerald-400" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="font-bold text-emerald-400">VPN ST VILLAGE — бесплатный прокси</h3>
+              <p className="text-sm text-gray-400 mt-1">
+                У вас активна VPN-подписка! Получите 1 бесплатный Telegram-прокси.
+                {vpnStatus.vpnExpiresAt && (
+                  <span className="block mt-0.5 text-xs text-gray-500">
+                    Действует до {new Date(vpnStatus.vpnExpiresAt).toLocaleDateString('ru-RU')}
+                  </span>
+                )}
+              </p>
+              {locations.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mt-3">
+                  <button onClick={() => setVpnLocFlag('')}
+                    className={`px-3 py-1 rounded-lg text-xs transition ${!vpnLocFlag ? 'bg-emerald-500 text-white' : 'bg-surface-light text-gray-300 hover:bg-surface-lighter'}`}>
+                    🌐 Авто
+                  </button>
+                  {locations.map(loc => (
+                    <button key={loc.flag} onClick={() => setVpnLocFlag(loc.flag)}
+                      className={`px-3 py-1 rounded-lg text-xs transition ${vpnLocFlag === loc.flag ? 'bg-emerald-500 text-white' : 'bg-surface-light text-gray-300 hover:bg-surface-lighter'}`}>
+                      {loc.flag} {loc.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <button onClick={handleFreeVpnOrder} disabled={vpnOrdering}
+                className="mt-3 flex items-center gap-2 px-5 py-2 rounded-xl font-semibold text-white transition bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 disabled:opacity-50 text-sm">
+                {vpnOrdering ? <Spinner size="sm" /> : <><Gift size={14} /> Получить бесплатно</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {vpnStatus?.enabled && vpnStatus.hasVpn && vpnStatus.hasFreeProxy && (
+        <div className="card border border-emerald-500/20 bg-emerald-500/5">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center shrink-0">
+              <Check size={16} className="text-emerald-400" />
+            </div>
+            <p className="text-sm text-emerald-400">
+              Ваш бесплатный прокси по VPN ST VILLAGE уже активен
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Plans grid */}
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">

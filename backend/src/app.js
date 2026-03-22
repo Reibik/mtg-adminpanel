@@ -45,6 +45,8 @@ function runMigrations() {
     "ALTER TABLE users ADD COLUMN next_reset_at DATETIME DEFAULT NULL",
     "ALTER TABLE users ADD COLUMN total_traffic_rx_bytes INTEGER DEFAULT 0",
     "ALTER TABLE users ADD COLUMN total_traffic_tx_bytes INTEGER DEFAULT 0",
+    // v2.1.0 — VPN ST VILLAGE free proxy for VPN subscribers
+    "ALTER TABLE orders ADD COLUMN is_vpn_free INTEGER DEFAULT 0",
   ];
   for (const sql of migrations) {
     try { db.prepare(sql).run(); } catch (_) {}
@@ -1353,6 +1355,7 @@ setInterval(syncGitHubChangelog, 60 * 60 * 1000);
 setInterval(() => clientRoutes.processAutoRenewals().catch(e => console.error('Auto-renewal error:', e)), 3600000);
 setInterval(() => clientRoutes.checkPendingPayments().catch(e => console.error('Payment check error:', e)), 2 * 60 * 1000);
 setInterval(() => runAutoBackup().catch(e => console.error('Auto-backup error:', e)), 60 * 60 * 1000);
+setInterval(() => clientRoutes.checkVpnFreeProxies().catch(e => console.error('VPN free proxy check error:', e)), 6 * 3600000);
 
 app.listen(PORT, () => {
   console.log(`🔒 MTG Panel running on http://0.0.0.0:${PORT}`);
@@ -1364,4 +1367,5 @@ app.listen(PORT, () => {
   setTimeout(() => clientRoutes.processAutoRenewals().catch(() => {}), 15000);
   setTimeout(() => clientRoutes.checkPendingPayments().catch(() => {}), 20000);
   setTimeout(() => runAutoBackup().catch(() => {}), 30000);
+  setTimeout(() => clientRoutes.checkVpnFreeProxies().catch(() => {}), 60000);
 });

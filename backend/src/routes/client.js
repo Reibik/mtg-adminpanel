@@ -6,6 +6,7 @@ const mailer = require('../mailer');
 const yookassa = require('../yookassa');
 const ssh = require('../ssh');
 const nalog = require('../nalog');
+const remnawave = require('../remnawave');
 
 // ── Rate limiting (simple in-memory) ──────────────────────
 const rateLimits = {};
@@ -649,13 +650,93 @@ router.delete('/orders/:id', auth.authCustomer, async (req, res) => {
 });
 
 // ═══════════════════════════════════════════════════════════
+// VPN ST VILLAGE — free proxy for VPN subscribers
+// ═══════════════════════════════════════════════════════════
+
+router.get('/vpn-status', auth.authCustomer, async (req, res) => {
+  if (!remnawave.isEnabled()) {
+    return res.json({ enabled: false, hasVpn: false, hasFreeProxy: false });
+  }
+  try {
+    const { hasVpn, expiresAt } = await remnawave.checkVpnSubscription(req.customer);
+    const freeOrder = db.prepare(
+      "SELECT id FROM orders WHERE customer_id = ? AND is_vpn_free = 1 AND status IN ('active', 'pending')"
+    ).get(req.customer.id);
+
+    res.json({
+      enabled: true,
+      hasVpn,
+      vpnExpiresAt: expiresAt ? expiresAt.toISOString() : null,
+      hasFreeProxy: !!freeOrder,
+      freeOrderId: freeOrder ? freeOrder.id : null,
+      freePlanId: remnawave.FREE_PLAN_ID(),
+    });
+  } catch (e) {
+    console.error('VPN status check error:', e.message);
+    res.json({ enabled: true, hasVpn: false, hasFreeProxy: false });
+  }
+});
+
+router.post('/orders/free-vpn', auth.authCustomer, async (req, res) => {
+  if (!remnawave.isEnabled()) {
+    return res.status(400).json({ error: 'Функция VPN-бонуса не настроена' });
+  }
+
+  try {
+    // 1. Verify VPN subscription
+    const { hasVpn, expiresAt } = await remnawave.checkVpnSubscription(req.customer);
+    if (!hasVpn) {
+      return res.status(403).json({ error: 'Нет активной VPN ST VILLAGE подписки' });
+    }
+
+    // 2. Check no existing free proxy
+    const existing = db.prepare(
+      "SELECT id FROM orders WHERE customer_id = ? AND is_vpn_free = 1 AND status IN ('active', 'pending')"
+    ).get(req.customer.id);
+    if (existing) {
+      return res.status(409).json({ error: 'У вас уже есть бесплатный прокси по VPN-подписке' });
+    }
+
+    // 3. Get the free plan
+    const freePlanId = remnawave.FREE_PLAN_ID();
+    const plan = db.prepare('SELECT * FROM plans WHERE id = ?').get(freePlanId);
+    if (!plan) {
+      return res.status(400).json({ error: 'Тарифный план для VPN-бонуса не найден. Обратитесь к администратору.' });
+    }
+
+    const { location_flag } = req.body || {};
+
+    // 4. Create order with price=0, is_vpn_free=1
+    const result = db.prepare(
+      `INSERT INTO orders (customer_id, plan_id, status, config, price, currency, period, is_vpn_free)
+       VALUES (?, ?, 'pending', ?, 0, ?, ?, 1)`
+    ).run(
+      req.customer.id, plan.id,
+      JSON.stringify({ location_flag: location_flag || null }),
+      plan.currency, plan.period
+    );
+
+    const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(result.lastInsertRowid);
+
+    // 5. Activate immediately (no payment needed)
+    await activateOrder(order, expiresAt);
+
+    console.log(`🎁 Free VPN proxy created for customer #${req.customer.id}, order #${order.id}`);
+    res.json({ ok: true, order_id: order.id });
+  } catch (e) {
+    console.error('Free VPN order error:', e.message);
+    res.status(500).json({ error: 'Ошибка при создании бесплатного прокси: ' + e.message });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════
 // PROXIES (customer's active connections)
 // ═══════════════════════════════════════════════════════════
 
 router.get('/proxies', auth.authCustomer, (req, res) => {
   const orders = db.prepare(
     `SELECT o.id as order_id, o.status as order_status, o.expires_at, o.auto_renew,
-            o.node_id, o.user_name, o.price, o.currency, o.period,
+            o.node_id, o.user_name, o.price, o.currency, o.period, o.is_vpn_free,
             p.name as plan_name, p.max_devices,
             n.name as node_name, n.host as node_host, n.flag as node_flag,
             u.port, u.secret, u.status as proxy_status, u.last_seen_at,
@@ -957,7 +1038,7 @@ router.post('/webhook/yookassa', async (req, res) => {
 // ORDER ACTIVATION (provision proxy)
 // ═══════════════════════════════════════════════════════════
 
-async function activateOrder(order) {
+async function activateOrder(order, vpnExpiresAt) {
   try {
     const plan = db.prepare('SELECT * FROM plans WHERE id = ?').get(order.plan_id);
     const config = order.config ? JSON.parse(order.config) : {};
@@ -993,13 +1074,18 @@ async function activateOrder(order) {
     // Create proxy via SSH (reuse existing logic)
     const { port, secret } = await ssh.createRemoteUser(node, userName);
 
-    // Calculate expiry
-    let expiresAt = new Date();
-    const period = plan ? plan.period : order.period;
-    if (period === 'daily') expiresAt.setDate(expiresAt.getDate() + 1);
-    else if (period === 'monthly') expiresAt.setMonth(expiresAt.getMonth() + 1);
-    else if (period === 'yearly') expiresAt.setFullYear(expiresAt.getFullYear() + 1);
-    else expiresAt.setMonth(expiresAt.getMonth() + 1); // default monthly
+    // Calculate expiry (use VPN expiry for free VPN orders, else period-based)
+    let expiresAt;
+    if (vpnExpiresAt instanceof Date && !isNaN(vpnExpiresAt)) {
+      expiresAt = vpnExpiresAt;
+    } else {
+      expiresAt = new Date();
+      const period = plan ? plan.period : order.period;
+      if (period === 'daily') expiresAt.setDate(expiresAt.getDate() + 1);
+      else if (period === 'monthly') expiresAt.setMonth(expiresAt.getMonth() + 1);
+      else if (period === 'yearly') expiresAt.setFullYear(expiresAt.getFullYear() + 1);
+      else expiresAt.setMonth(expiresAt.getMonth() + 1); // default monthly
+    }
 
     // Insert into users table (admin panel's existing table)
     db.prepare(
@@ -1225,8 +1311,70 @@ async function processAutoRenewals() {
   }
 }
 
+// ═══════════════════════════════════════════════════════════
+// VPN FREE PROXY REVOCATION (background job)
+// ═══════════════════════════════════════════════════════════
+
+async function checkVpnFreeProxies() {
+  if (!remnawave.isEnabled()) return;
+
+  const freeOrders = db.prepare(
+    `SELECT o.*, c.email, c.email_verified, c.telegram_id, c.telegram_username, c.name as customer_name
+     FROM orders o
+     JOIN customers c ON o.customer_id = c.id
+     WHERE o.is_vpn_free = 1 AND o.status = 'active'`
+  ).all();
+
+  for (const order of freeOrders) {
+    try {
+      const { hasVpn } = await remnawave.checkVpnSubscription({
+        telegram_id: order.telegram_id,
+        email: order.email,
+      });
+
+      if (!hasVpn) {
+        console.log(`🔒 VPN subscription expired for customer #${order.customer_id}, revoking free proxy order #${order.id}`);
+
+        // Remove proxy from node
+        if (order.node_id && order.user_name) {
+          const node = db.prepare('SELECT * FROM nodes WHERE id = ?').get(order.node_id);
+          if (node) {
+            try {
+              await ssh.removeRemoteUser(node, order.user_name);
+            } catch (e) {
+              console.error(`Failed to remove VPN free proxy ${order.user_name}:`, e.message);
+            }
+          }
+        }
+
+        // Cancel order and remove user record
+        const revokeTransaction = db.transaction(() => {
+          if (order.node_id && order.user_name) {
+            db.prepare('DELETE FROM users WHERE node_id = ? AND name = ?').run(order.node_id, order.user_name);
+          }
+          db.prepare("UPDATE orders SET status = 'cancelled', auto_renew = 0 WHERE id = ?").run(order.id);
+        });
+        revokeTransaction();
+
+        // Notify customer
+        if (order.email && order.email_verified) {
+          mailer.sendSubscriptionExpiringEmail(order.email, {
+            daysLeft: 0,
+            orderName: `Бесплатный прокси (VPN ST VILLAGE)`,
+          }).catch(e => console.error('VPN revocation email error:', e));
+        }
+
+        console.log(`✅ Free VPN proxy order #${order.id} revoked for customer #${order.customer_id}`);
+      }
+    } catch (e) {
+      console.error(`VPN check error for order #${order.id}:`, e.message);
+    }
+  }
+}
+
 // Export for use in app.js
 router.processAutoRenewals = processAutoRenewals;
 router.checkPendingPayments = checkPendingPayments;
+router.checkVpnFreeProxies = checkVpnFreeProxies;
 
 module.exports = router;
