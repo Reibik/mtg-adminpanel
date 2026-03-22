@@ -21,7 +21,7 @@ function LinkTelegramSection({ customer, setCustomer, toast }) {
     try {
       const { data } = await profileApi.linkTelegram(user);
       if (data.customer) setCustomer(data.customer);
-      toast.success('Telegram успешно привязан!');
+      toast.success(data.merged ? 'Telegram привязан, аккаунты объединены!' : 'Telegram успешно привязан!');
     } catch (err) {
       toast.error(err.response?.data?.error || 'Ошибка привязки Telegram');
     } finally {
@@ -109,9 +109,14 @@ export default function Profile() {
     e.preventDefault();
     setLinkLoading(true);
     try {
-      await profileApi.linkEmail({ email: linkEmail });
-      setLinkSent(true);
-      toast.success('Письмо отправлено — проверьте почту');
+      const { data } = await profileApi.linkEmail({ email: linkEmail });
+      if (data.merged) {
+        if (data.customer) setCustomer(data.customer);
+        toast.success('Аккаунты объединены, email привязан!');
+      } else {
+        setLinkSent(true);
+        toast.success('Письмо отправлено — проверьте почту');
+      }
     } catch (err) { toast.error(err.response?.data?.error || 'Ошибка'); }
     finally { setLinkLoading(false); }
   };

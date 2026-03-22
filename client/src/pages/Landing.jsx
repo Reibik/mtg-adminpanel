@@ -57,20 +57,20 @@ export default function Landing() {
       <header className="fixed top-0 w-full z-50 bg-surface-dark/80 backdrop-blur border-b border-white/5">
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-gradient-to-br from-primary to-accent rounded-lg flex items-center justify-center">
+            <div className="w-8 h-8 bg-gradient-to-br from-primary to-accent rounded-lg flex items-center justify-center shrink-0">
               <Zap size={18} className="text-white" />
             </div>
-            <span className="text-lg font-bold gradient-text">ST VILLAGE PROXY</span>
+            <span className="text-base sm:text-lg font-bold gradient-text whitespace-nowrap">ST VILLAGE PROXY</span>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             {isAuthenticated ? (
-              <Link to="/dashboard" className="btn-primary btn-sm flex items-center gap-2">
-                <LayoutDashboard size={16} /> Личный кабинет
+              <Link to="/dashboard" className="btn-primary btn-sm flex items-center gap-1 sm:gap-2">
+                <LayoutDashboard size={16} /> <span className="hidden sm:inline">Личный кабинет</span><span className="sm:hidden">Кабинет</span>
               </Link>
             ) : (
               <>
                 <Link to="/login" className="btn-secondary btn-sm">Войти</Link>
-                <Link to="/register" className="btn-primary btn-sm">Регистрация</Link>
+                <Link to="/register" className="btn-primary btn-sm hidden sm:inline-flex">Регистрация</Link>
               </>
             )}
           </div>
@@ -78,20 +78,20 @@ export default function Landing() {
       </header>
 
       {/* Hero */}
-      <section className="pt-32 pb-20 px-4">
+      <section className="pt-24 sm:pt-32 pb-12 sm:pb-20 px-4">
         <div className="max-w-4xl mx-auto text-center">
-          <div className="inline-flex items-center gap-2 bg-primary/10 rounded-full px-4 py-1.5 mb-6">
+          <div className="inline-flex items-center gap-2 bg-primary/10 rounded-full px-3 sm:px-4 py-1.5 mb-4 sm:mb-6">
             <span className="w-2 h-2 bg-success rounded-full animate-pulse" />
-            <span className="text-sm text-primary-light font-medium">{version ? `Версия ${version}` : 'Доступно'} — Онлайн</span>
+            <span className="text-xs sm:text-sm text-primary-light font-medium">{version ? `Версия ${version}` : 'Доступно'} — Онлайн</span>
           </div>
-          <h1 className="text-4xl md:text-6xl font-extrabold mb-6 leading-tight">
+          <h1 className="text-3xl sm:text-4xl md:text-6xl font-extrabold mb-4 sm:mb-6 leading-tight">
             Быстрые и безопасные{' '}
             <span className="gradient-text">прокси для Telegram</span>
           </h1>
-          <p className="text-lg text-gray-400 mb-10 max-w-2xl mx-auto">
+          <p className="text-base sm:text-lg text-gray-400 mb-8 sm:mb-10 max-w-2xl mx-auto">
             MTProto прокси с мониторингом в реальном времени, автоматическим управлением и мгновенным подключением через QR-код
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center">
             {isAuthenticated ? (
               <Link to="/dashboard" className="btn-primary btn-lg">
                 Перейти в кабинет <ArrowRight size={18} />
@@ -137,17 +137,18 @@ export default function Landing() {
       )}
 
       {/* Features */}
-      <section className="py-20 px-4 bg-surface/50">
+      <section className="py-12 sm:py-20 px-4 bg-surface/50">
         <div className="max-w-6xl mx-auto">
-          <h2 className="text-3xl font-bold text-center mb-12">Почему <span className="gradient-text">ST VILLAGE PROXY</span>?</h2>
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <h2 className="text-2xl sm:text-3xl font-bold text-center mb-8 sm:mb-12">Почему <span className="gradient-text">ST VILLAGE PROXY</span>?</h2>
+          <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
             {features.map((f, i) => (
               <div key={i} className="card-hover text-center">
-                <div className="w-12 h-12 bg-gradient-to-br from-primary/20 to-accent/20 rounded-xl flex items-center justify-center mx-auto mb-4">
-                  <f.icon size={24} className="text-primary-light" />
+                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-primary/20 to-accent/20 rounded-xl flex items-center justify-center mx-auto mb-3 sm:mb-4">
+                  <f.icon size={20} className="text-primary-light sm:hidden" />
+                  <f.icon size={24} className="text-primary-light hidden sm:block" />
                 </div>
-                <h3 className="font-semibold mb-2">{f.title}</h3>
-                <p className="text-sm text-gray-400">{f.desc}</p>
+                <h3 className="font-semibold mb-1 sm:mb-2 text-sm sm:text-base">{f.title}</h3>
+                <p className="text-xs sm:text-sm text-gray-400">{f.desc}</p>
               </div>
             ))}
           </div>
@@ -155,22 +156,23 @@ export default function Landing() {
       </section>
 
       {/* VPN Bonus */}
-      <section className="py-20 px-4">
+      <section className="py-12 sm:py-20 px-4">
         <div className="max-w-4xl mx-auto">
-          <div className="relative overflow-hidden rounded-3xl border border-emerald-500/20 bg-gradient-to-br from-emerald-500/10 via-surface to-primary/5 p-8 md:p-12">
+          <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl border border-emerald-500/20 bg-gradient-to-br from-emerald-500/10 via-surface to-primary/5 p-6 sm:p-8 md:p-12">
             <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl" />
-            <div className="relative flex flex-col md:flex-row items-center gap-8">
-              <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-emerald-500/30 to-emerald-600/20 flex items-center justify-center shrink-0">
-                <Gift size={40} className="text-emerald-400" />
+            <div className="relative flex flex-col md:flex-row items-center gap-6 sm:gap-8">
+              <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-br from-emerald-500/30 to-emerald-600/20 flex items-center justify-center shrink-0">
+                <Gift size={32} className="text-emerald-400 sm:hidden" />
+                <Gift size={40} className="text-emerald-400 hidden sm:block" />
               </div>
               <div className="flex-1 text-center md:text-left">
-                <h2 className="text-2xl md:text-3xl font-extrabold mb-3">
+                <h2 className="text-xl sm:text-2xl md:text-3xl font-extrabold mb-2 sm:mb-3">
                   Подписчики <span className="text-emerald-400">VPN ST VILLAGE</span> — прокси бесплатно!
                 </h2>
-                <p className="text-gray-400 mb-4 max-w-xl">
+                <p className="text-sm sm:text-base text-gray-400 mb-4 max-w-xl">
                   Если у вас уже есть активная подписка на VPN ST VILLAGE, вы получаете бесплатный Telegram-прокси на весь срок действия VPN. Никаких доплат — просто активируйте в личном кабинете.
                 </p>
-                <div className="flex flex-wrap gap-4 justify-center md:justify-start text-sm">
+                <div className="flex flex-col sm:flex-row flex-wrap gap-2 sm:gap-4 justify-center md:justify-start text-sm">
                   <div className="flex items-center gap-2 text-emerald-400">
                     <CheckCircle size={16} /> <span>Бесплатно для подписчиков VPN</span>
                   </div>
@@ -181,8 +183,8 @@ export default function Landing() {
                     <CheckCircle size={16} /> <span>Действует пока активна VPN</span>
                   </div>
                 </div>
-                <div className="mt-6">
-                  <Link to={isAuthenticated ? '/plans' : '/register'} className="inline-flex items-center gap-2 px-6 py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 transition text-sm">
+                <div className="mt-5 sm:mt-6">
+                  <Link to={isAuthenticated ? '/plans' : '/register'} className="inline-flex items-center gap-2 px-5 sm:px-6 py-2.5 sm:py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 transition text-sm">
                     {isAuthenticated ? 'Активировать в кабинете' : 'Зарегистрироваться и получить'} <ArrowRight size={16} />
                   </Link>
                 </div>
@@ -193,11 +195,11 @@ export default function Landing() {
       </section>
 
       {/* Plans */}
-      <section id="plans" className="py-20 px-4">
+      <section id="plans" className="py-12 sm:py-20 px-4">
         <div className="max-w-6xl mx-auto">
-          <h2 className="text-3xl font-bold text-center mb-4">Тарифные планы</h2>
-          <p className="text-center text-gray-400 mb-12">Выберите подходящий план или настройте под себя</p>
-          <div className="grid md:grid-cols-3 gap-6 max-w-4xl mx-auto">
+          <h2 className="text-2xl sm:text-3xl font-bold text-center mb-3 sm:mb-4">Тарифные планы</h2>
+          <p className="text-center text-gray-400 mb-8 sm:mb-12 text-sm sm:text-base">Выберите подходящий план или настройте под себя</p>
+          <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6 max-w-4xl mx-auto">
             {plansLoading && (
               <div className="col-span-3 flex justify-center py-12">
                 <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
@@ -237,9 +239,9 @@ export default function Landing() {
       </section>
 
       {/* FAQ */}
-      <section className="py-20 px-4 bg-surface/50">
+      <section className="py-12 sm:py-20 px-4 bg-surface/50">
         <div className="max-w-2xl mx-auto">
-          <h2 className="text-3xl font-bold text-center mb-12">Частые вопросы</h2>
+          <h2 className="text-2xl sm:text-3xl font-bold text-center mb-8 sm:mb-12">Частые вопросы</h2>
           <div className="space-y-3">
             {faqs.map((faq, i) => (
               <div key={i} className="card cursor-pointer" onClick={() => setOpenFaq(openFaq === i ? null : i)}>
@@ -257,9 +259,9 @@ export default function Landing() {
       </section>
 
       {/* Footer */}
-      <footer className="py-14 px-4 border-t border-white/5 bg-surface-dark">
+      <footer className="py-10 sm:py-14 px-4 border-t border-white/5 bg-surface-dark">
         <div className="max-w-6xl mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-10 mb-10">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-8 sm:gap-10 mb-8 sm:mb-10">
             {/* Brand */}
             <div>
               <div className="flex items-center gap-2 mb-3">

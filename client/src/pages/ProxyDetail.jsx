@@ -147,7 +147,7 @@ export default function ProxyDetail() {
 
       {/* Connection status */}
       {proxy && (
-        <div className="card flex items-center gap-4">
+        <div className="card flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
           <div className={`w-3 h-3 rounded-full ${stats?.running ? 'bg-success animate-pulse' : 'bg-gray-500'}`} />
           <div className="flex-1">
             <p className="font-semibold">{stats?.running ? 'Прокси онлайн' : 'Прокси офлайн'}</p>
@@ -203,7 +203,7 @@ export default function ProxyDetail() {
       {/* Renew subscription */}
       {order.status === 'active' && !isVpnFree && (
         <div className="card">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div>
               <h3 className="font-semibold flex items-center gap-2"><RefreshCw size={16} className="text-primary" /> Продлить подписку</h3>
               <p className="text-sm text-gray-400 mt-1">
@@ -220,7 +220,7 @@ export default function ProxyDetail() {
                 toast.error(err.response?.data?.error || 'Ошибка при продлении');
               } finally { setRenewLoading(false); }
             }} disabled={renewLoading}
-              className="btn-primary flex items-center gap-2 shrink-0">
+              className="btn-primary flex items-center gap-2 shrink-0 w-full sm:w-auto justify-center">
               {renewLoading ? <Spinner size="sm" /> : <><RefreshCw size={16} /> Продлить</>}
             </button>
           </div>
@@ -242,7 +242,7 @@ export default function ProxyDetail() {
 
       {/* Auto-renew */}
       {!isVpnFree && (
-      <div className="card flex items-center justify-between">
+      <div className="card flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
           <h3 className="font-semibold">Автопродление</h3>
           <p className="text-sm text-gray-400">

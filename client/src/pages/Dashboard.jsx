@@ -224,19 +224,20 @@ export default function Dashboard() {
         {/* Balance card */}
         <div className="card col-span-2 lg:col-span-2 relative overflow-hidden"
           style={{background: 'linear-gradient(135deg, rgba(124,111,247,0.15), rgba(99,102,241,0.08))'}}>
-          <div className="flex items-center justify-between gap-4 flex-wrap">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center shrink-0">
-                <Wallet size={24} className="text-primary" />
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
+            <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-primary/20 flex items-center justify-center shrink-0">
+                <Wallet size={20} className="text-primary sm:hidden" />
+                <Wallet size={24} className="text-primary hidden sm:block" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <p className="text-xs text-gray-400">Баланс</p>
-                <p className="text-2xl font-black gradient-text">{balance.toFixed(2)} ₽</p>
-                <p className="text-[11px] text-gray-500 mt-0.5">Используется для автопродления прокси</p>
+                <p className="text-xl sm:text-2xl font-black gradient-text">{balance.toFixed(2)} ₽</p>
+                <p className="text-[11px] text-gray-500 mt-0.5 hidden sm:block">Используется для автопродления прокси</p>
               </div>
             </div>
             <button onClick={() => { setShowTopup(true); setTopupAmount(''); }}
-              className="btn-primary btn-sm flex items-center gap-1.5">
+              className="btn-primary btn-sm flex items-center gap-1.5 w-full sm:w-auto justify-center">
               <Plus size={14} /> Пополнить
             </button>
           </div>
@@ -248,33 +249,33 @@ export default function Dashboard() {
         vpnStatus.hasVpn ? (
           vpnStatus.hasFreeProxy ? (
             <div className="card border border-emerald-500/20 bg-emerald-500/5">
-              <div className="flex items-center gap-4">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
                 <div className="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center shrink-0">
                   <Gift size={20} className="text-emerald-400" />
                 </div>
-                <div className="flex-1">
+                <div className="flex-1 min-w-0">
                   <p className="font-semibold text-emerald-400">Бесплатный прокси по VPN активен</p>
                   <p className="text-xs text-gray-500 mt-0.5">
                     Действует пока активна подписка VPN ST VILLAGE
                     {vpnStatus.vpnExpiresAt && ` · до ${new Date(vpnStatus.vpnExpiresAt).toLocaleDateString('ru-RU')}`}
                   </p>
                 </div>
-                <Link to="/proxies" className="btn-secondary btn-sm flex items-center gap-1.5 shrink-0">
+                <Link to="/proxies" className="btn-secondary btn-sm flex items-center gap-1.5 shrink-0 w-full sm:w-auto justify-center">
                   Перейти <ArrowRight size={14} />
                 </Link>
               </div>
             </div>
           ) : (
             <div className="card border border-emerald-500/30 bg-gradient-to-r from-emerald-500/10 to-emerald-600/5">
-              <div className="flex items-center gap-4">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
                 <div className="w-12 h-12 rounded-xl bg-emerald-500/20 flex items-center justify-center shrink-0">
                   <Gift size={24} className="text-emerald-400" />
                 </div>
-                <div className="flex-1">
+                <div className="flex-1 min-w-0">
                   <p className="font-bold text-emerald-400">У вас есть бесплатный прокси!</p>
                   <p className="text-sm text-gray-400 mt-0.5">Ваша VPN ST VILLAGE подписка даёт бесплатный Telegram-прокси. Активируйте его прямо сейчас.</p>
                 </div>
-                <Link to="/plans" className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-white bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 transition text-sm shrink-0">
+                <Link to="/plans" className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-white bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 transition text-sm shrink-0 w-full sm:w-auto">
                   <Gift size={14} /> Получить
                 </Link>
               </div>
@@ -282,16 +283,16 @@ export default function Dashboard() {
           )
         ) : (
           <div className="card border border-white/5 bg-gradient-to-r from-primary/5 to-accent/5">
-            <div className="flex items-center gap-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
               <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
                 <Gift size={20} className="text-primary" />
               </div>
-              <div className="flex-1">
+              <div className="flex-1 min-w-0">
                 <p className="font-semibold">Бесплатный прокси для подписчиков VPN</p>
                 <p className="text-xs text-gray-500 mt-0.5">Оформите подписку на VPN ST VILLAGE и получите бесплатный Telegram-прокси</p>
               </div>
               <a href="https://cabinet.st-villagevpn.ru/" target="_blank" rel="noopener noreferrer"
-                className="btn-secondary btn-sm flex items-center gap-1.5 shrink-0">
+                className="btn-secondary btn-sm flex items-center gap-1.5 shrink-0 w-full sm:w-auto justify-center">
                 Подробнее <ArrowRight size={14} />
               </a>
             </div>

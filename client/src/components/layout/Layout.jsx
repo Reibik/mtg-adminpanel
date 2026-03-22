@@ -88,7 +88,7 @@ export default function Layout() {
       </div>
 
       {/* Main content */}
-      <main className="flex-1 min-w-0 lg:p-8 p-4 pt-16 pb-24 lg:pt-8 lg:pb-8 flex flex-col">
+      <main className="flex-1 min-w-0 lg:p-8 p-4 pt-16 pb-24 lg:pt-8 lg:pb-8 safe-left safe-right flex flex-col">
         <div className="max-w-6xl mx-auto animate-fade-in flex-1 w-full">
           <AnnouncementsBanner />
           <Outlet />

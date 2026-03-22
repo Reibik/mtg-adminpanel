@@ -289,16 +289,46 @@ router.post('/profile/link-email', auth.authCustomer, async (req, res) => {
     return res.status(400).json({ error: 'Email уже привязан' });
   }
 
-  const existing = db.prepare('SELECT id FROM customers WHERE email = ? AND id != ?')
-    .get(email.toLowerCase().trim(), req.customer.id);
-  if (existing) return res.status(409).json({ error: 'Этот email уже занят' });
+  const normalizedEmail = email.toLowerCase().trim();
+  const existing = db.prepare('SELECT * FROM customers WHERE email = ? AND id != ?')
+    .get(normalizedEmail, req.customer.id);
+
+  if (existing) {
+    // Merge: transfer all data from the email-only account to the current (telegram) account
+    const mergeFrom = existing.id;
+    const mergeTo = req.customer.id;
+    db.prepare('UPDATE orders SET customer_id = ? WHERE customer_id = ?').run(mergeTo, mergeFrom);
+    db.prepare('UPDATE payments SET customer_id = ? WHERE customer_id = ?').run(mergeTo, mergeFrom);
+    db.prepare('UPDATE sessions SET customer_id = ? WHERE customer_id = ?').run(mergeTo, mergeFrom);
+    // Merge balance
+    const fromBalance = Number(existing.balance || 0);
+    if (fromBalance > 0) {
+      db.prepare('UPDATE customers SET balance = balance + ? WHERE id = ?').run(fromBalance, mergeTo);
+    }
+    // Copy password hash if the current account doesn't have one
+    if (!req.customer.password_hash && existing.password_hash) {
+      db.prepare('UPDATE customers SET password_hash = ? WHERE id = ?').run(existing.password_hash, mergeTo);
+    }
+    // Delete the old account
+    db.prepare('DELETE FROM customers WHERE id = ?').run(mergeFrom);
+    console.log(`Merged customer #${mergeFrom} into #${mergeTo} (email link)`);
+
+    // Set email as already verified (since it belonged to a verified account)
+    if (existing.email_verified) {
+      db.prepare(
+        'UPDATE customers SET email = ?, email_verified = 1, email_verify_token = NULL, email_verify_expires = NULL WHERE id = ?'
+      ).run(normalizedEmail, req.customer.id);
+      const updated = db.prepare('SELECT * FROM customers WHERE id = ?').get(req.customer.id);
+      return res.json({ ok: true, customer: sanitizeCustomer(updated), merged: true, message: 'Аккаунты объединены, email привязан' });
+    }
+  }
 
   const token = auth.generateEmailToken();
   const expires = new Date(Date.now() + 86400000).toISOString();
 
   db.prepare(
     'UPDATE customers SET email = ?, email_verified = 0, email_verify_token = ?, email_verify_expires = ? WHERE id = ?'
-  ).run(email.toLowerCase().trim(), token, expires, req.customer.id);
+  ).run(normalizedEmail, token, expires, req.customer.id);
 
   await mailer.sendLinkEmailVerification(email, token);
   res.json({ ok: true, message: 'Проверьте почту для подтверждения' });
@@ -316,16 +346,32 @@ router.post('/profile/link-telegram', auth.authCustomer, (req, res) => {
     }
 
     const telegramId = String(data.id);
-    const existing = db.prepare('SELECT id FROM customers WHERE telegram_id = ? AND id != ?')
+    const existing = db.prepare('SELECT * FROM customers WHERE telegram_id = ? AND id != ?')
       .get(telegramId, req.customer.id);
-    if (existing) return res.status(409).json({ error: 'Этот Telegram уже привязан к другому аккаунту' });
+
+    if (existing) {
+      // Merge: transfer all data from the telegram-only account to the current account
+      const mergeFrom = existing.id;
+      const mergeTo = req.customer.id;
+      db.prepare('UPDATE orders SET customer_id = ? WHERE customer_id = ?').run(mergeTo, mergeFrom);
+      db.prepare('UPDATE payments SET customer_id = ? WHERE customer_id = ?').run(mergeTo, mergeFrom);
+      db.prepare('UPDATE sessions SET customer_id = ? WHERE customer_id = ?').run(mergeTo, mergeFrom);
+      // Merge balance
+      const fromBalance = Number(existing.balance || 0);
+      if (fromBalance > 0) {
+        db.prepare('UPDATE customers SET balance = balance + ? WHERE id = ?').run(fromBalance, mergeTo);
+      }
+      // Delete the old account
+      db.prepare('DELETE FROM customers WHERE id = ?').run(mergeFrom);
+      console.log(`Merged customer #${mergeFrom} into #${mergeTo} (telegram link)`);
+    }
 
     db.prepare(
       'UPDATE customers SET telegram_id = ?, telegram_username = ? WHERE id = ?'
     ).run(telegramId, data.username || null, req.customer.id);
 
     const updated = db.prepare('SELECT * FROM customers WHERE id = ?').get(req.customer.id);
-    res.json({ ok: true, customer: sanitizeCustomer(updated) });
+    res.json({ ok: true, customer: sanitizeCustomer(updated), merged: !!existing });
   } catch (e) {
     console.error('Link telegram error:', e);
     res.status(500).json({ error: 'Ошибка сервера' });

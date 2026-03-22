@@ -106,7 +106,7 @@ export default function Plans() {
       {/* VPN ST VILLAGE free proxy banner */}
       {vpnStatus?.enabled && vpnStatus.hasVpn && !vpnStatus.hasFreeProxy && (
         <div className="card border border-emerald-500/30 bg-emerald-500/5">
-          <div className="flex items-start gap-4">
+          <div className="flex flex-col sm:flex-row items-start gap-3 sm:gap-4">
             <div className="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center shrink-0">
               <Gift size={20} className="text-emerald-400" />
             </div>
@@ -123,19 +123,19 @@ export default function Plans() {
               {locations.length > 0 && (
                 <div className="flex flex-wrap gap-1.5 mt-3">
                   <button onClick={() => setVpnLocFlag('')}
-                    className={`px-3 py-1 rounded-lg text-xs transition ${!vpnLocFlag ? 'bg-emerald-500 text-white' : 'bg-surface-light text-gray-300 hover:bg-surface-lighter'}`}>
+                    className={`px-3 py-1.5 rounded-lg text-xs transition ${!vpnLocFlag ? 'bg-emerald-500 text-white' : 'bg-surface-light text-gray-300 hover:bg-surface-lighter'}`}>
                     🌐 Авто
                   </button>
                   {locations.map(loc => (
                     <button key={loc.flag} onClick={() => setVpnLocFlag(loc.flag)}
-                      className={`px-3 py-1 rounded-lg text-xs transition ${vpnLocFlag === loc.flag ? 'bg-emerald-500 text-white' : 'bg-surface-light text-gray-300 hover:bg-surface-lighter'}`}>
+                      className={`px-3 py-1.5 rounded-lg text-xs transition ${vpnLocFlag === loc.flag ? 'bg-emerald-500 text-white' : 'bg-surface-light text-gray-300 hover:bg-surface-lighter'}`}>
                       {loc.flag} {loc.name}
                     </button>
                   ))}
                 </div>
               )}
               <button onClick={handleFreeVpnOrder} disabled={vpnOrdering}
-                className="mt-3 flex items-center gap-2 px-5 py-2 rounded-xl font-semibold text-white transition bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 disabled:opacity-50 text-sm">
+                className="mt-3 flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-white transition bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 disabled:opacity-50 text-sm w-full sm:w-auto justify-center sm:justify-start">
                 {vpnOrdering ? <Spinner size="sm" /> : <><Gift size={14} /> Получить бесплатно</>}
               </button>
             </div>
@@ -225,17 +225,17 @@ export default function Plans() {
 
       {/* Order button */}
       {selectedPlan && (
-        <div className="card flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div>
+        <div className="card flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
+          <div className="min-w-0">
             <p className="text-sm text-gray-400">Выбран тариф:</p>
-            <p className="font-bold">{selectedPlan.name} — {selectedPlan.price} ₽ / {selectedPlan.period === 'monthly' ? 'мес.' : selectedPlan.period === 'yearly' ? 'год' : 'день'}</p>
+            <p className="font-bold truncate">{selectedPlan.name} — {selectedPlan.price} ₽ / {selectedPlan.period === 'monthly' ? 'мес.' : selectedPlan.period === 'yearly' ? 'год' : 'день'}</p>
           </div>
           {vpnStatus?.hasVpn && vpnStatus?.freePlanId === selectedPlan.id && !vpnStatus?.hasFreeProxy ? (
-            <button onClick={handleFreeVpnOrder} disabled={vpnOrdering} className="px-8 flex items-center gap-2 py-2.5 rounded-xl font-semibold text-white transition bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 disabled:opacity-50">
+            <button onClick={handleFreeVpnOrder} disabled={vpnOrdering} className="w-full sm:w-auto px-8 flex items-center justify-center gap-2 py-2.5 rounded-xl font-semibold text-white transition bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 disabled:opacity-50">
               {vpnOrdering ? <Spinner size="sm" /> : <><Gift size={16} /> Активировать бесплатно!</>}
             </button>
           ) : (
-            <button onClick={() => setShowConfirm(true)} disabled={ordering} className="btn-primary px-8 flex items-center gap-2">
+            <button onClick={() => setShowConfirm(true)} disabled={ordering} className="btn-primary w-full sm:w-auto px-8 flex items-center justify-center gap-2">
               <Zap size={16} /> Оформить заказ
             </button>
           )}
