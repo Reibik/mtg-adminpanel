@@ -2464,7 +2464,7 @@ function PlansManager() {
       </div></div>
       <div style={{maxWidth:600,display:'flex',flexDirection:'column',gap:16}}>
         <div className="card">
-          <div className="card-header"><div className="card-title"><I.Tag/> Основное</div></div>
+          <div className="card-header"><div className="card-title"><I.Tag/> Основное</div>{editing!=='new'&&<span style={{fontSize:12,fontFamily:'var(--mono)',background:'var(--bg3)',border:'1px solid var(--b1)',borderRadius:6,padding:'2px 8px',color:'var(--t3)',userSelect:'all'}}>PLAN_ID: {editing.id}</span>}</div>
           <div style={{display:'grid',gap:12}}>
             <div className="form-group"><label className="form-label">Название *</label>
               <input className="form-input" value={form.name} onChange={e=>set('name',e.target.value)} placeholder="Базовый" /></div>
@@ -2532,7 +2532,7 @@ function PlansManager() {
                 <div style={{display:'flex',alignItems:'center',gap:12}}>
                   <div style={{width:40,height:40,borderRadius:10,background:p.is_active?'rgba(124,111,247,0.1)':'rgba(107,114,128,0.1)',display:'flex',alignItems:'center',justifyContent:'center',color:p.is_active?'var(--vi)':'var(--t3)'}}><I.Tag/></div>
                   <div>
-                    <div style={{fontWeight:600,fontSize:15}}>{p.name}</div>
+                    <div style={{display:'flex',alignItems:'center',gap:8}}><span style={{fontWeight:600,fontSize:15}}>{p.name}</span><span style={{fontSize:11,fontFamily:'var(--mono)',background:'var(--bg3)',border:'1px solid var(--b1)',borderRadius:5,padding:'1px 6px',color:'var(--t3)',userSelect:'all'}}>ID: {p.id}</span></div>
                     <div style={{fontSize:12,color:'var(--t2)'}}>{p.price} {p.currency||'RUB'} / {periodLabels[p.period]||p.period} · до {p.max_devices} устр.{p.traffic_limit_gb ? ` · ${p.traffic_limit_gb} ГБ` : ' · Безлимит'}</div>
                   </div>
                 </div>
