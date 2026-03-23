@@ -35,7 +35,7 @@ export default function Layout() {
   return (
     <div className="min-h-screen flex">
       {/* Sidebar — Desktop */}
-      <aside className="hidden lg:flex flex-col w-60 bg-surface border-r border-white/5 p-4 sticky top-0 h-screen">
+      <aside className="hidden lg:flex flex-col w-60 bg-surface border-r border-white/5 p-4 fixed top-0 left-0 h-screen overflow-y-auto z-40">
         <Link to="/dashboard" className="flex items-center gap-2 px-3 py-2 mb-6">
           <div className="w-8 h-8 bg-gradient-to-br from-primary to-accent rounded-lg flex items-center justify-center">
             <Zap size={18} />
@@ -88,7 +88,7 @@ export default function Layout() {
       </div>
 
       {/* Main content */}
-      <main className="flex-1 min-w-0 lg:p-8 p-4 pt-16 pb-24 lg:pt-8 lg:pb-8 safe-left safe-right flex flex-col">
+      <main className="flex-1 min-w-0 lg:p-8 lg:ml-60 p-4 pt-16 pb-24 lg:pt-8 lg:pb-8 safe-left safe-right flex flex-col">
         <div className="max-w-6xl mx-auto animate-fade-in flex-1 w-full">
           <AnnouncementsBanner />
           <Outlet />
