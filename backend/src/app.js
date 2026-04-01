@@ -1150,6 +1150,60 @@ app.delete('/api/nodes/:id/users/:name', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// ── Migrate user to another node ──────────────────────────
+app.post('/api/nodes/:id/users/:name/migrate', async (req, res) => {
+  const { target_node_id } = req.body;
+  if (!target_node_id) return res.status(400).json({ error: 'target_node_id required' });
+
+  const sourceNode = db.prepare('SELECT * FROM nodes WHERE id = ?').get(req.params.id);
+  if (!sourceNode) return res.status(404).json({ error: 'Source node not found' });
+
+  const targetNode = db.prepare('SELECT * FROM nodes WHERE id = ?').get(target_node_id);
+  if (!targetNode) return res.status(404).json({ error: 'Target node not found' });
+
+  if (sourceNode.id === targetNode.id) return res.status(400).json({ error: 'Нельзя переносить на ту же ноду' });
+
+  const user = db.prepare('SELECT * FROM users WHERE node_id = ? AND name = ?').get(req.params.id, req.params.name);
+  if (!user) return res.status(404).json({ error: 'User not found' });
+
+  try {
+    // 1. Create proxy on target node (same name, gets new port + secret)
+    const { port: newPort, secret: newSecret } = await ssh.createRemoteUser(targetNode, user.name);
+
+    // 2. Remove proxy from source node
+    await ssh.removeRemoteUser(sourceNode, user.name).catch(e => {
+      console.error(`Warning: failed to remove ${user.name} from source node:`, e.message);
+    });
+
+    // 3. Update DB in transaction
+    const migrateTransaction = db.transaction(() => {
+      db.prepare(`UPDATE users SET node_id=?, port=?, secret=? WHERE id=?`)
+        .run(targetNode.id, newPort, newSecret, user.id);
+      // Update orders referencing this user
+      db.prepare(`UPDATE orders SET node_id=? WHERE node_id=? AND user_name=?`)
+        .run(targetNode.id, sourceNode.id, user.name);
+    });
+    migrateTransaction();
+
+    // 4. Invalidate cache for both nodes
+    delete nodeCache.users[sourceNode.id];
+    delete nodeCache.users[targetNode.id];
+    delete nodeCache.traffic[sourceNode.id];
+    delete nodeCache.traffic[targetNode.id];
+
+    res.json({
+      ok: true,
+      new_port: newPort,
+      new_secret: newSecret,
+      new_link: `tg://proxy?server=${targetNode.host}&port=${newPort}&secret=${newSecret}`,
+      target_node: { id: targetNode.id, name: targetNode.name, host: targetNode.host },
+    });
+  } catch (e) {
+    console.error(`Migrate ${user.name} error:`, e.message);
+    res.status(500).json({ error: 'Ошибка миграции: ' + e.message });
+  }
+});
+
 // Stop: save traffic snapshot before stopping so UI keeps last known value
 app.post('/api/nodes/:id/users/:name/stop', async (req, res) => {
   const node = db.prepare('SELECT * FROM nodes WHERE id = ?').get(req.params.id);
