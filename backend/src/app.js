@@ -47,6 +47,8 @@ function runMigrations() {
     "ALTER TABLE users ADD COLUMN total_traffic_tx_bytes INTEGER DEFAULT 0",
     // v2.1.0 — VPN ST VILLAGE free proxy for VPN subscribers
     "ALTER TABLE orders ADD COLUMN is_vpn_free INTEGER DEFAULT 0",
+    // v2.7.0 — Custom subscription name
+    "ALTER TABLE orders ADD COLUMN custom_name TEXT DEFAULT NULL",
   ];
   for (const sql of migrations) {
     try { db.prepare(sql).run(); } catch (_) {}
@@ -829,8 +831,13 @@ app.get('/api/nodes/:id/check', async (req, res) => {
 app.get('/api/nodes/:id/traffic', async (req, res) => {
   const node = db.prepare('SELECT * FROM nodes WHERE id = ?').get(req.params.id);
   if (!node) return res.status(404).json({ error: 'Not found' });
-  try { res.json(await ssh.getTraffic(node)); }
-  catch (_) { res.json({}); }
+
+  const cached = nodeCache.traffic[node.id];
+  if (cached && (Date.now() - cached.ts) < CACHE_TTL * 3) {
+    return res.json(cached.data);
+  }
+  await refreshNodeTrafficCache(node);
+  res.json((nodeCache.traffic[node.id] || {}).data || {});
 });
 
 app.get('/api/nodes/:id/mtg-version', async (req, res) => {
@@ -926,69 +933,139 @@ app.post('/api/nodes/:id/mtg-update', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.get('/api/status', async (req, res) => {
-  const nodes = db.prepare('SELECT * FROM nodes').all();
-  const results = await Promise.allSettled(
-    nodes.map(async node => {
-      const status = await ssh.getNodeStatus(node);
-      let online_users = 0;
-      let system = null;
-      if (node.agent_port) {
-        try {
-          const fullData = await ssh.getAgentFullMetrics(node);
-          if (fullData) {
-            online_users = (fullData.containers || []).filter(c => (c.connections || 0) > 0).length;
-            system = fullData.system || null;
-          }
-        } catch (_) {}
+// ── Background cache for admin endpoints ──────────────────
+const nodeCache = {
+  status:  { data: null, updating: false },
+  users:   {},   // { nodeId: { data: [...], ts: Date.now() } }
+  traffic: {},   // { nodeId: { data: {...}, ts: Date.now() } }
+};
+const CACHE_TTL = 20000; // 20 seconds
+
+async function refreshStatusCache() {
+  if (nodeCache.status.updating) return;
+  nodeCache.status.updating = true;
+  try {
+    const nodes = db.prepare('SELECT * FROM nodes').all();
+    const results = await Promise.allSettled(
+      nodes.map(async node => {
+        const status = await ssh.getNodeStatus(node);
+        let online_users = 0;
+        let system = null;
+        if (node.agent_port) {
+          try {
+            const fullData = await ssh.getAgentFullMetrics(node);
+            if (fullData) {
+              online_users = (fullData.containers || []).filter(c => (c.connections || 0) > 0).length;
+              system = fullData.system || null;
+            }
+          } catch (_) {}
+        }
+        return { id: node.id, name: node.name, host: node.host, ...status, online_users, system };
+      })
+    );
+    nodeCache.status.data = results.map((r, i) => r.status === 'fulfilled'
+      ? r.value
+      : { id: nodes[i].id, name: nodes[i].name, online: false, online_users: 0 }
+    );
+    nodeCache.status.ts = Date.now();
+  } catch (e) {
+    console.error('Status cache refresh error:', e.message);
+  } finally {
+    nodeCache.status.updating = false;
+  }
+}
+
+async function refreshNodeUsersCache(node) {
+  const key = node.id;
+  try {
+    const dbUsers = db.prepare('SELECT * FROM users WHERE node_id = ?').all(node.id);
+    const remoteUsers = await ssh.getRemoteUsers(node);
+
+    const mkUser = (u, remote) => ({
+      ...u,
+      connections: remote ? remote.connections : 0,
+      running: remote ? !remote.status.includes('stopped') : false,
+      is_online: remote ? (remote.connections || 0) > 0 : false,
+      link: `tg://proxy?server=${node.host}&port=${u.port}&secret=${u.secret}`,
+      expired: u.expires_at ? new Date(u.expires_at) < new Date() : false,
+    });
+
+    // Device limit enforcement + last_seen updates
+    for (const remote of remoteUsers) {
+      const dbUser = dbUsers.find(u => u.name === remote.name);
+      if (dbUser && dbUser.max_devices && (remote.connections || 0) > dbUser.max_devices) {
+        console.log(`⚠️ Device limit exceeded: ${remote.name} (${remote.connections}/${dbUser.max_devices}) — stopping`);
+        ssh.stopRemoteUser(node, remote.name).catch(() => {});
+        db.prepare('UPDATE users SET status=? WHERE node_id=? AND name=?').run('stopped', node.id, remote.name);
+        remote.status = 'stopped';
+        remote.connections = 0;
       }
-      return { id: node.id, name: node.name, host: node.host, ...status, online_users, system };
-    })
-  );
-  res.json(results.map((r, i) => r.status === 'fulfilled'
-    ? r.value
-    : { id: nodes[i].id, name: nodes[i].name, online: false, online_users: 0 }
-  ));
+      if ((remote.connections || 0) > 0) {
+        db.prepare("UPDATE users SET last_seen_at=datetime('now') WHERE node_id=? AND name=?")
+          .run(node.id, remote.name);
+      }
+    }
+
+    nodeCache.users[key] = {
+      data: dbUsers.map(u => mkUser(u, remoteUsers.find(r => r.name === u.name))),
+      ts: Date.now(),
+    };
+  } catch (_) {
+    const dbUsers = db.prepare('SELECT * FROM users WHERE node_id = ?').all(node.id);
+    nodeCache.users[key] = {
+      data: dbUsers.map(u => ({
+        ...u, connections: 0, running: false, is_online: false,
+        link: `tg://proxy?server=${node.host}&port=${u.port}&secret=${u.secret}`,
+        expired: u.expires_at ? new Date(u.expires_at) < new Date() : false,
+      })),
+      ts: Date.now(),
+    };
+  }
+}
+
+async function refreshNodeTrafficCache(node) {
+  try {
+    const data = await ssh.getTraffic(node);
+    nodeCache.traffic[node.id] = { data, ts: Date.now() };
+  } catch (_) {
+    nodeCache.traffic[node.id] = { data: {}, ts: Date.now() };
+  }
+}
+
+async function refreshAllCaches() {
+  const nodes = db.prepare('SELECT * FROM nodes').all();
+  await refreshStatusCache();
+  await Promise.allSettled(nodes.map(async n => {
+    await refreshNodeUsersCache(n);
+    await refreshNodeTrafficCache(n);
+  }));
+}
+
+// Start background cache refresh
+setInterval(refreshAllCaches, CACHE_TTL);
+setTimeout(refreshAllCaches, 3000);
+
+app.get('/api/status', async (req, res) => {
+  if (nodeCache.status.data && (Date.now() - (nodeCache.status.ts || 0)) < CACHE_TTL * 3) {
+    return res.json(nodeCache.status.data);
+  }
+  // Fallback: compute live if cache is empty
+  await refreshStatusCache();
+  res.json(nodeCache.status.data || []);
 });
 
 // ── Users ─────────────────────────────────────────────────
 app.get('/api/nodes/:id/users', async (req, res) => {
   const node = db.prepare('SELECT * FROM nodes WHERE id = ?').get(req.params.id);
   if (!node) return res.status(404).json({ error: 'Not found' });
-  const dbUsers = db.prepare('SELECT * FROM users WHERE node_id = ?').all(req.params.id);
 
-  const mkUser = (u, remote) => ({
-    ...u,
-    connections: remote ? remote.connections : 0,
-    running: remote ? !remote.status.includes('stopped') : false,
-    is_online: remote ? (remote.connections || 0) > 0 : false,
-    link: `tg://proxy?server=${node.host}&port=${u.port}&secret=${u.secret}`,
-    expired: u.expires_at ? new Date(u.expires_at) < new Date() : false,
-  });
-
-  try {
-    const remoteUsers = await ssh.getRemoteUsers(node);
-
-    // Real-time device limit enforcement
-    for (const remote of remoteUsers) {
-      const dbUser = dbUsers.find(u => u.name === remote.name);
-      if (dbUser && dbUser.max_devices && (remote.connections || 0) > dbUser.max_devices) {
-        console.log(`⚠️ Device limit exceeded: ${remote.name} (${remote.connections}/${dbUser.max_devices}) — stopping`);
-        ssh.stopRemoteUser(node, remote.name).catch(() => {});
-        db.prepare('UPDATE users SET status=? WHERE node_id=? AND name=?').run('stopped', req.params.id, remote.name);
-        remote.status = 'stopped';
-        remote.connections = 0;
-      }
-      if ((remote.connections || 0) > 0) {
-        db.prepare("UPDATE users SET last_seen_at=datetime('now') WHERE node_id=? AND name=?")
-          .run(req.params.id, remote.name);
-      }
-    }
-
-    res.json(dbUsers.map(u => mkUser(u, remoteUsers.find(r => r.name === u.name))));
-  } catch (_) {
-    res.json(dbUsers.map(u => mkUser(u, null)));
+  const cached = nodeCache.users[node.id];
+  if (cached && (Date.now() - cached.ts) < CACHE_TTL * 3) {
+    return res.json(cached.data);
   }
+  // Fallback: refresh this node's cache now
+  await refreshNodeUsersCache(node);
+  res.json((nodeCache.users[node.id] || {}).data || []);
 });
 
 app.post('/api/nodes/:id/sync', async (req, res) => {

@@ -96,6 +96,7 @@ export const ordersApi = {
   create: (data) => api.post('/orders', data),
   toggleAutoRenew: (id, enabled) => api.put(`/orders/${id}/auto-renew`, { enabled }),
   remove: (id) => api.delete(`/orders/${id}`),
+  rename: (id, name) => api.put(`/orders/${id}/rename`, { name }),
   payWithBalance: (id) => api.post(`/orders/${id}/pay-balance`),
   renew: (id) => api.post(`/orders/${id}/renew`),
   createFreeVpn: (data) => api.post('/orders/free-vpn', data),

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { proxiesApi, ordersApi } from '../api/client';
 import { useToast } from '../components/ui/Toast';
-import { Wifi, WifiOff, Globe, Clock, Users, ArrowRight, Trash2, X, AlertTriangle, RefreshCw } from 'lucide-react';
+import { Wifi, WifiOff, Globe, Clock, Users, ArrowRight, Trash2, X, AlertTriangle, RefreshCw, Pencil, Check } from 'lucide-react';
 import Spinner from '../components/ui/Spinner';
 
 export default function Proxies() {
@@ -12,6 +12,8 @@ export default function Proxies() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const [renewing, setRenewing] = useState(null);
+  const [renaming, setRenaming] = useState(null); // order id
+  const [renameValue, setRenameValue] = useState('');
   const toast = useToast();
 
   const loadData = () => {
@@ -50,6 +52,17 @@ export default function Proxies() {
     } finally { setRenewing(null); }
   };
 
+  const handleRename = async (orderId) => {
+    try {
+      await ordersApi.rename(orderId, renameValue);
+      toast.success('Название обновлено');
+      setRenaming(null);
+      loadData();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Ошибка при переименовании');
+    }
+  };
+
   if (loading) return <div className="flex justify-center py-20"><Spinner size="lg" /></div>;
 
   // merge orders with proxy data (preserve order id/status)
@@ -79,22 +92,47 @@ export default function Proxies() {
     const expires = item.expires_at ? new Date(item.expires_at) : null;
     const daysLeft = expires ? Math.ceil((expires - Date.now()) / 86400000) : 0;
     const isVpnFree = !!item.is_vpn_free;
+    const displayName = item.custom_name || item.plan_name || `Заказ #${item.id}`;
+    const isRenaming = renaming === item.id;
 
     return (
       <div className="card-hover group block relative">
         <Link to={`/proxies/${item.id}`} className="block">
           <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <span className="text-xl">{item.node_flag || <Globe size={18} />}</span>
-              <span className="font-semibold">{item.plan_name || `Заказ #${item.id}`}</span>
-              {isVpnFree && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-emerald-500/20 text-emerald-400 font-medium">VPN Бонус</span>
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              <span className="text-xl shrink-0">{item.node_flag || <Globe size={18} />}</span>
+              {isRenaming ? (
+                <div className="flex items-center gap-1.5 flex-1 min-w-0" onClick={e => { e.preventDefault(); e.stopPropagation(); }}>
+                  <input
+                    value={renameValue}
+                    onChange={e => setRenameValue(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') handleRename(item.id); if (e.key === 'Escape') setRenaming(null); }}
+                    maxLength={50}
+                    className="input text-sm py-1 px-2 flex-1 min-w-0"
+                    autoFocus
+                    placeholder="Название подписки"
+                  />
+                  <button onClick={() => handleRename(item.id)} className="p-1 text-success hover:bg-success/10 rounded-lg transition shrink-0">
+                    <Check size={16} />
+                  </button>
+                  <button onClick={() => setRenaming(null)} className="p-1 text-gray-500 hover:bg-white/10 rounded-lg transition shrink-0">
+                    <X size={16} />
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <span className="font-semibold truncate">{displayName}</span>
+                  {isVpnFree && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-emerald-500/20 text-emerald-400 font-medium shrink-0">VPN Бонус</span>
+                  )}
+                </>
               )}
             </div>
-            {isActive
-              ? <span className="badge-success flex items-center gap-1"><Wifi size={10} /> Активен</span>
-              : <span className="badge-danger flex items-center gap-1"><WifiOff size={10} /> {item.status === 'expired' ? 'Истёк' : item.status}</span>
-            }
+            {!isRenaming && (
+              isActive
+                ? <span className="badge-success flex items-center gap-1 shrink-0"><Wifi size={10} /> Активен</span>
+                : <span className="badge-danger flex items-center gap-1 shrink-0"><WifiOff size={10} /> {item.status === 'expired' ? 'Истёк' : item.status}</span>
+            )}
           </div>
 
           {isActive && (
@@ -135,14 +173,27 @@ export default function Proxies() {
           )}
         </Link>
 
-        {/* Delete button */}
-        <button
-          onClick={(e) => { e.preventDefault(); e.stopPropagation(); setDeleteTarget(item); }}
-          className="absolute top-3 right-3 p-1.5 rounded-lg text-gray-600 hover:text-danger hover:bg-danger/10 opacity-0 group-hover:opacity-100 transition z-10"
-          title="Удалить прокси"
-        >
-          <Trash2 size={14} />
-        </button>
+        {/* Rename + Delete buttons */}
+        <div className="absolute top-3 right-3 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition z-10">
+          <button
+            onClick={(e) => {
+              e.preventDefault(); e.stopPropagation();
+              setRenameValue(item.custom_name || item.plan_name || '');
+              setRenaming(item.id);
+            }}
+            className="p-1.5 rounded-lg text-gray-600 hover:text-primary hover:bg-primary/10 transition"
+            title="Переименовать"
+          >
+            <Pencil size={14} />
+          </button>
+          <button
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setDeleteTarget(item); }}
+            className="p-1.5 rounded-lg text-gray-600 hover:text-danger hover:bg-danger/10 transition"
+            title="Удалить прокси"
+          >
+            <Trash2 size={14} />
+          </button>
+        </div>
       </div>
     );
   };

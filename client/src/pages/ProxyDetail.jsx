@@ -11,7 +11,7 @@ import {
 import { Line } from 'react-chartjs-2';
 import {
   ArrowLeft, Copy, QrCode, Wifi, Clock,
-  Users, ToggleLeft, ToggleRight, Download, Upload, Signal, RefreshCw, Gift
+  Users, ToggleLeft, ToggleRight, Download, Upload, Signal, RefreshCw, Gift, Pencil, Check, X
 } from 'lucide-react';
 import Spinner from '../components/ui/Spinner';
 
@@ -27,6 +27,8 @@ export default function ProxyDetail() {
   const [loading, setLoading] = useState(true);
   const [toggling, setToggling] = useState(false);
   const [renewLoading, setRenewLoading] = useState(false);
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [renameValue, setRenameValue] = useState('');
   const toast = useToast();
 
   const load = () => {
@@ -63,6 +65,17 @@ export default function ProxyDetail() {
   const copyLink = (text) => {
     navigator.clipboard.writeText(text);
     toast.success('Скопировано!');
+  };
+
+  const handleRename = async () => {
+    try {
+      await ordersApi.rename(orderId, renameValue);
+      setOrder(prev => ({ ...prev, custom_name: renameValue.trim() || null }));
+      toast.success('Название обновлено');
+      setIsRenaming(false);
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Ошибка');
+    }
   };
 
   if (loading) return <div className="flex justify-center py-20"><Spinner size="lg" /></div>;
@@ -103,13 +116,36 @@ export default function ProxyDetail() {
       <div className="flex items-center gap-3 flex-wrap">
         <Link to="/proxies" className="btn-secondary p-2"><ArrowLeft size={18} /></Link>
         <div className="flex-1 min-w-0">
-          <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-2">
-            <span className="text-xl sm:text-2xl">{order.node_flag || '🌐'}</span>
-            <span className="truncate">{order.plan_name || `Заказ #${order.id}`}</span>
-            {isVpnFree && (
-              <span className="text-xs px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-400 font-medium shrink-0">VPN Бонус</span>
-            )}
-          </h1>
+          {isRenaming ? (
+            <div className="flex items-center gap-2">
+              <input
+                value={renameValue}
+                onChange={e => setRenameValue(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') handleRename(); if (e.key === 'Escape') setIsRenaming(false); }}
+                maxLength={50}
+                className="input text-lg py-1.5 px-3 flex-1 min-w-0"
+                autoFocus
+                placeholder="Название подписки"
+              />
+              <button onClick={handleRename} className="p-2 text-success hover:bg-success/10 rounded-lg transition"><Check size={18} /></button>
+              <button onClick={() => setIsRenaming(false)} className="p-2 text-gray-500 hover:bg-white/10 rounded-lg transition"><X size={18} /></button>
+            </div>
+          ) : (
+            <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-2">
+              <span className="text-xl sm:text-2xl">{order.node_flag || '🌐'}</span>
+              <span className="truncate">{order.custom_name || order.plan_name || `Заказ #${order.id}`}</span>
+              {isVpnFree && (
+                <span className="text-xs px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-400 font-medium shrink-0">VPN Бонус</span>
+              )}
+              <button
+                onClick={() => { setRenameValue(order.custom_name || order.plan_name || ''); setIsRenaming(true); }}
+                className="p-1.5 text-gray-500 hover:text-primary hover:bg-primary/10 rounded-lg transition shrink-0"
+                title="Переименовать"
+              >
+                <Pencil size={16} />
+              </button>
+            </h1>
+          )}
           <p className="text-sm text-gray-400">ID: {order.id}</p>
         </div>
         <span className={`shrink-0 ${order.status === 'active' ? 'badge-success' : 'badge-danger'}`}>

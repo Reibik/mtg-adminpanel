@@ -588,6 +588,21 @@ router.put('/orders/:id/auto-renew', auth.authCustomer, (req, res) => {
   res.json({ ok: true, auto_renew: enabled ? 1 : 0 });
 });
 
+// ── Rename subscription ───────────────────────────────────
+router.put('/orders/:id/rename', auth.authCustomer, (req, res) => {
+  const { name } = req.body;
+  if (typeof name !== 'string' || name.length > 50) {
+    return res.status(400).json({ error: 'Имя должно быть не длиннее 50 символов' });
+  }
+  const order = db.prepare('SELECT * FROM orders WHERE id = ? AND customer_id = ?')
+    .get(req.params.id, req.customer.id);
+  if (!order) return res.status(404).json({ error: 'Заказ не найден' });
+
+  const trimmed = name.trim() || null;
+  db.prepare('UPDATE orders SET custom_name = ? WHERE id = ?').run(trimmed, order.id);
+  res.json({ ok: true, custom_name: trimmed });
+});
+
 // ── Manual subscription renewal (extend from balance) ─────
 router.post('/orders/:id/renew', auth.authCustomer, async (req, res) => {
   const order = db.prepare('SELECT * FROM orders WHERE id = ? AND customer_id = ?')
@@ -679,14 +694,14 @@ router.delete('/orders/:id', auth.authCustomer, async (req, res) => {
       }
     }
 
-    // Atomic: delete user + cancel order in transaction
-    const cancelTransaction = db.transaction(() => {
+    // Atomic: delete user + delete order entirely
+    const deleteTransaction = db.transaction(() => {
       if (order.node_id && order.user_name) {
         db.prepare('DELETE FROM users WHERE node_id = ? AND name = ?').run(order.node_id, order.user_name);
       }
-      db.prepare("UPDATE orders SET status = 'cancelled', auto_renew = 0 WHERE id = ?").run(order.id);
+      db.prepare('DELETE FROM orders WHERE id = ?').run(order.id);
     });
-    cancelTransaction();
+    deleteTransaction();
 
     res.json({ ok: true });
   } catch (e) {
