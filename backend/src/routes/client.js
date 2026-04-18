@@ -699,6 +699,7 @@ router.delete('/orders/:id', auth.authCustomer, async (req, res) => {
       if (order.node_id && order.user_name) {
         db.prepare('DELETE FROM users WHERE node_id = ? AND name = ?').run(order.node_id, order.user_name);
       }
+      db.prepare('UPDATE payments SET order_id = NULL WHERE order_id = ?').run(order.id);
       db.prepare('DELETE FROM orders WHERE id = ?').run(order.id);
     });
     deleteTransaction();

@@ -769,8 +769,23 @@ app.put('/api/nodes/:id', (req, res) => {
 });
 
 app.delete('/api/nodes/:id', (req, res) => {
-  db.prepare('DELETE FROM nodes WHERE id = ?').run(req.params.id);
-  res.json({ ok: true });
+  const nodeId = req.params.id;
+  const node = db.prepare('SELECT * FROM nodes WHERE id = ?').get(nodeId);
+  if (!node) return res.status(404).json({ error: 'Node not found' });
+
+  try {
+    const deleteNode = db.transaction(() => {
+      db.prepare('DELETE FROM connections_history WHERE node_id = ?').run(nodeId);
+      db.prepare('UPDATE payments SET order_id = NULL WHERE order_id IN (SELECT id FROM orders WHERE node_id = ?)').run(nodeId);
+      db.prepare('DELETE FROM orders WHERE node_id = ?').run(nodeId);
+      db.prepare('DELETE FROM nodes WHERE id = ?').run(nodeId);
+    });
+    deleteNode();
+    res.json({ ok: true });
+  } catch (e) {
+    console.error(`Delete node #${nodeId} error:`, e.message);
+    res.status(500).json({ error: 'Ошибка при удалении ноды' });
+  }
 });
 
 // Check agent health on a node
@@ -1306,8 +1321,21 @@ app.put('/api/admin/users/:id', requireAdmin, async (req, res) => {
 });
 
 app.delete('/api/admin/users/:id', requireAdmin, (req, res) => {
-  db.prepare('DELETE FROM admin_users WHERE id = ?').run(req.params.id);
-  res.json({ ok: true });
+  try {
+    const user = db.prepare('SELECT * FROM admin_users WHERE id = ?').get(req.params.id);
+    if (!user) return res.status(404).json({ error: 'Пользователь не найден' });
+
+    const adminCount = db.prepare("SELECT COUNT(*) as cnt FROM admin_users WHERE role = 'admin'").get().cnt;
+    if (user.role === 'admin' && adminCount <= 1) {
+      return res.status(400).json({ error: 'Нельзя удалить последнего администратора' });
+    }
+
+    db.prepare('DELETE FROM admin_users WHERE id = ?').run(req.params.id);
+    res.json({ ok: true });
+  } catch (e) {
+    console.error(`Delete admin user #${req.params.id} error:`, e.message);
+    res.status(500).json({ error: 'Ошибка при удалении пользователя' });
+  }
 });
 
 // ── SPA fallback ──────────────────────────────────────────

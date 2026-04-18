@@ -101,7 +101,7 @@ db.exec(`
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (customer_id) REFERENCES customers(id),
     FOREIGN KEY (plan_id) REFERENCES plans(id),
-    FOREIGN KEY (node_id) REFERENCES nodes(id)
+    FOREIGN KEY (node_id) REFERENCES nodes(id) ON DELETE SET NULL
   );
 
   CREATE TABLE IF NOT EXISTS payments (
@@ -118,7 +118,7 @@ db.exec(`
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     confirmed_at DATETIME,
     FOREIGN KEY (customer_id) REFERENCES customers(id),
-    FOREIGN KEY (order_id) REFERENCES orders(id)
+    FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE SET NULL
   );
 
   CREATE TABLE IF NOT EXISTS sessions (
@@ -129,7 +129,7 @@ db.exec(`
     user_agent TEXT,
     expires_at DATETIME NOT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (customer_id) REFERENCES customers(id)
+    FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE
   );
 
   CREATE TABLE IF NOT EXISTS changelog (
@@ -146,7 +146,7 @@ db.exec(`
     version TEXT NOT NULL,
     seen_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (customer_id, version),
-    FOREIGN KEY (customer_id) REFERENCES customers(id)
+    FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE
   );
 `);
 
