@@ -138,6 +138,12 @@ async function getToken() {
 async function createReceipt({ amount, customerName, description, paymentDate }) {
   if (!isEnabled()) return null;
 
+  const numAmount = parseFloat(amount);
+  if (!numAmount || numAmount <= 0) {
+    console.log('НПД: пропуск чека — сумма <= 0');
+    return null;
+  }
+
   const { inn } = getCredentials();
   if (!inn) throw new Error('НПД: не указан ИНН');
 

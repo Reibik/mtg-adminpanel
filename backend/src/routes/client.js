@@ -613,6 +613,10 @@ router.post('/orders/:id/renew', auth.authCustomer, async (req, res) => {
   const plan = order.plan_id ? db.prepare('SELECT * FROM plans WHERE id = ?').get(order.plan_id) : null;
   const price = plan ? plan.price : order.price;
 
+  if (!price || price <= 0) {
+    return res.status(400).json({ error: 'Невозможно продлить бесплатный заказ' });
+  }
+
   const customer = db.prepare('SELECT * FROM customers WHERE id = ?').get(req.customer.id);
   if (!customer) return res.status(404).json({ error: 'Клиент не найден' });
   if ((customer.balance || 0) < price) {
@@ -953,6 +957,9 @@ router.post('/payments/:id/retry', auth.authCustomer, async (req, res) => {
   }
 
   try {
+    // Mark old order as cancelled
+    db.prepare("UPDATE orders SET status = 'cancelled' WHERE id = ? AND status = 'pending'").run(order.id);
+
     const plan = db.prepare('SELECT * FROM plans WHERE id = ?').get(order.plan_id);
     const config = order.config ? JSON.parse(order.config) : {};
 
@@ -1299,6 +1306,7 @@ async function processAutoRenewals() {
      JOIN customers c ON o.customer_id = c.id
      LEFT JOIN plans p ON o.plan_id = p.id
      WHERE o.auto_renew = 1 AND o.status = 'active'
+     AND o.is_vpn_free != 1
      AND o.expires_at IS NOT NULL AND o.expires_at < datetime(?)`
   ).all(soon);
 
@@ -1306,6 +1314,10 @@ async function processAutoRenewals() {
     try {
       const price = order.plan_price || order.price;
       const balance = order.balance || 0;
+
+      if (!price || price <= 0) {
+        continue; // Skip free/zero-price orders
+      }
 
       if (balance >= price) {
         // Atomic balance deduction (prevents double-spending)
